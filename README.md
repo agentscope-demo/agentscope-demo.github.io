@@ -49,7 +49,6 @@ Each run records the full message graph (sender, receiver, content, timestamps, 
 mas-tom/
 ├── main.py                     # FastAPI entry point
 ├── run_all.py                  # Master scenario runner (full matrix or filtered)
-├── pyproject.toml
 ├── requirements.txt
 │
 ├── src/
@@ -90,18 +89,6 @@ mas-tom/
 │       ├── settings.py         # Pydantic settings (reads .env / config.yaml)
 │       └── scenarios.yaml      # Scenario definitions
 │
-├── dashboard/                  # React + Vite frontend (dev)
-│   └── src/
-│       ├── api/client.js
-│       ├── hooks/
-│       │   ├── useQuery.js
-│       │   ├── useTimeline.js
-│       │   └── useScenario.js
-│       └── components/
-│           ├── AnomalyTimeline.jsx
-│           ├── BeliefPanel.jsx
-│           ├── QueryInterface.jsx
-│           └── RawLogView.jsx
 │
 └── logs/
     ├── raw/                    # Raw simulation logs  ({id}.raw.json)
