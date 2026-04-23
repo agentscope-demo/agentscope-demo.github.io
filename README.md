@@ -49,7 +49,6 @@ Each run records the full message graph (sender, receiver, content, timestamps, 
 mas-tom/
 ├── main.py                     # FastAPI entry point
 ├── run_all.py                  # Master scenario runner (full matrix or filtered)
-├── config.yaml                 # Top-level runtime config
 ├── pyproject.toml
 ├── requirements.txt
 │
