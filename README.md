@@ -16,6 +16,7 @@ MAS-ToM is a research framework for simulating multi-agent LLM pipelines under a
 - [Usage](#usage)
 - [Output Format](#output-format)
 - [CerebraAgent Dashboard](#cerebraagent-dashboard)
+- [Authors](#authors)
 - [Contributing](#contributing)
 
 ---
@@ -135,7 +136,7 @@ The full experiment crosses four axes, producing up to **72 scenarios** (3 topol
 
 ```bash
 # 1. Clone
-git clone https://github.com/<your-org>/mas-tom.git
+git clone https://github.com/KavanaVenkatesh/CerebraAgent/.git
 cd mas-tom
 
 # 2. Python environment
@@ -302,6 +303,18 @@ CerebraAgent is the visual analysis tool for MAS-ToM, served at `/` by the FastA
 - **Belief Panel** — per-agent trust scores and inferred goals at any selected timestep.
 - **Raw Log View** — full message content with attack injection metadata highlighted.
 - **Query Interface** — filter scenarios by topology, attack, agent count, and task; drill into individual runs.
+
+---
+
+## Authors
+
+This project was developed at **Virginia Tech**.
+
+| Name | Affiliation |
+|---|---|
+| Kavana Venkatesh | Virginia Tech |
+| Jafar Isbarov | Virginia Tech |
+| Tahira Kazimi | Virginia Tech |
 
 ---
 
