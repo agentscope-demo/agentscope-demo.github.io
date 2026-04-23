@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>MAS-ToM Observatory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0a0c12;--surface:#0d1117;--card:#111827;--card2:#161f2e;--card3:#1c2740;
+  --line:#1e293b;--line2:#2d3f5a;--line3:#3d5475;
+  --text:#e2e8f4;--muted:#637089;--dim:#344563;
+  --cyan:#22d3ee;--indigo:#818cf8;--violet:#a78bfa;
+  --green:#34d399;--amber:#fbbf24;--red:#f87171;--pink:#f472b6;
+  --cyan-dim:rgba(34,211,238,0.12);--indigo-dim:rgba(129,140,248,0.12);
+  --red-dim:rgba(248,113,113,0.12);--amber-dim:rgba(251,191,36,0.12);
+  --green-dim:rgba(52,211,153,0.12);
+  --font-mono:'JetBrains Mono',monospace;--font-body:'DM Sans',sans-serif;
+  --r:8px;--r2:12px;
+}
+body{font-family:var(--font-body);background:var(--ink);color:var(--text);height:100vh;font-size:13px;line-height:1.6;overflow:hidden;display:flex;flex-direction:column}
+button{cursor:pointer;border:none;font-family:var(--font-body);font-size:13px}
+input,textarea,select{font-family:var(--font-body);font-size:13px}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line3);border-radius:2px}
+
+/* TOPBAR */
+.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:50px;flex-shrink:0;z-index:300}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;border:1.5px solid var(--cyan);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--cyan)}
+.logo-text{font-size:13px;font-weight:600;letter-spacing:0.04em}
+.logo-sub{font-size:11px;color:var(--muted);font-weight:300}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.live-indicator{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-anim 2s ease-in-out infinite}
+@keyframes pulse-anim{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(52,211,153,0.4)}50%{opacity:0.7;box-shadow:0 0 0 4px rgba(52,211,153,0)}}
+
+/* CONDITION TOGGLE */
+.cond-toggle{display:flex;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:2px;gap:2px}
+.cond-btn{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:600;color:var(--muted);background:transparent;transition:all .2s;letter-spacing:.02em}
+.cond-btn.ca{background:var(--card2);color:var(--muted);border:1px solid var(--line2)}
+.cond-btn.cb{background:linear-gradient(135deg,var(--cyan),var(--indigo));color:var(--ink);font-weight:700}
+
+/* SHELL */
+.shell{display:grid;grid-template-columns:250px 1fr;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-top{padding:12px;border-bottom:1px solid var(--line);flex-shrink:0}
+.sidebar-label{font-size:9px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.search-input{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:7px 10px;color:var(--text);outline:none;transition:border-color 0.15s;margin-bottom:6px}
+.search-input:focus{border-color:var(--cyan)}
+.filter-select{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:6px 10px;color:var(--text);outline:none;margin-bottom:5px;appearance:none;cursor:pointer}
+.filter-select option{background:var(--card)}
+.s-list{flex:1;overflow-y:auto;padding:6px}
+.s-item{padding:9px 10px;border-radius:var(--r);cursor:pointer;border:1px solid transparent;transition:all 0.12s;margin-bottom:2px}
+.s-item:hover{background:var(--card);border-color:var(--line)}
+.s-item.active{background:var(--card);border-color:var(--cyan);box-shadow:0 0 0 1px rgba(34,211,238,0.1) inset}
+.s-item-id{font-family:var(--font-mono);font-size:10px;color:var(--cyan);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.s-item-badges{display:flex;gap:3px;flex-wrap:wrap}
+.s-item-stats{font-size:10px;color:var(--muted);margin-top:3px}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:0.03em}
+.b-collusion{background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)}
+.b-mitm{background:rgba(129,140,248,0.15);color:#818cf8;border:1px solid rgba(129,140,248,0.3)}
+.b-deception{background:rgba(244,114,182,0.15);color:#f472b6;border:1px solid rgba(244,114,182,0.3)}
+.b-baseline{background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3)}
+.b-topo{background:rgba(34,211,238,0.1);color:#67e8f9}
+.b-task{background:rgba(167,139,250,0.1);color:#c4b5fd}
+.b-injected{background:rgba(248,113,113,0.2);color:#fca5a5;border:1px solid rgba(248,113,113,0.4)}
+.b-tom{background:rgba(52,211,153,0.1);color:#6ee7b7}
+
+/* MAIN CONTENT */
+.content{overflow:hidden;background:var(--ink);display:flex;flex-direction:column}
+.drop-zone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--muted)}
+.drop-icon{font-size:40px;opacity:0.2}
+.drop-title{font-size:18px;font-weight:500;color:var(--text)}
+.drop-sub{font-size:13px;color:var(--muted)}
+
+/* SCENARIO HEADER */
+.sc-header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px;flex-shrink:0}
+.sc-id{font-family:var(--font-mono);font-size:12px;color:var(--cyan);font-weight:700;margin-bottom:6px}
+.sc-badges{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.kpi-row{display:flex;gap:10px;flex-wrap:wrap}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 14px;display:flex;flex-direction:column;align-items:flex-start;min-width:80px}
+.kpi-val{font-size:20px;font-weight:700;font-family:var(--font-mono);line-height:1}
+.kpi-lbl{font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.kpi.danger .kpi-val{color:var(--red)}.kpi.warning .kpi-val{color:var(--amber)}.kpi.success .kpi-val{color:var(--green)}.kpi.cyan .kpi-val{color:var(--cyan)}.kpi.violet .kpi-val{color:var(--violet)}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--line);background:var(--surface);padding:0 20px;flex-shrink:0;overflow-x:auto}
+.tab{padding:10px 14px;font-size:11px;font-weight:600;letter-spacing:0.04em;color:var(--muted);background:transparent;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.panels{flex:1;overflow-y:auto}
+.panel{display:none;padding:20px}
+.panel.active{display:block}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:600;letter-spacing:0.02em}
+.card-sub{font-size:11px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* NETWORK */
+#net-svg{width:100%;height:400px;border-radius:var(--r);background:var(--ink)}
+.node-label{fill:var(--text);font-size:10px;font-family:var(--font-mono);font-weight:700;pointer-events:none}
+.edge{fill:none;opacity:0.5}
+.edge.attack-edge{stroke:var(--red);opacity:0.9;stroke-dasharray:4 3}
+#net-info{min-height:50px;font-size:12px;padding:10px 0 0;color:var(--muted);line-height:1.7}
+
+/* AGENT STATE TAXONOMY */
+.state-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px}
+.state-chip{background:var(--card2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;text-align:center;transition:border-color 0.15s}
+.state-chip-name{font-size:11px;font-weight:600;margin-bottom:2px}
+.state-chip-count{font-size:18px;font-weight:700;font-family:var(--font-mono)}
+.s-stable .state-chip-count{color:var(--green)}.s-misled .state-chip-count{color:var(--amber)}
+.s-conflicted .state-chip-count{color:var(--violet)}.s-deceptive .state-chip-count{color:var(--red)}
+.s-cascading .state-chip-count{color:var(--pink)}
+
+/* TIMELINE EVENTS */
+.tl-events{display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto}
+.tl-event{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r);cursor:pointer;transition:border-color 0.12s}
+.tl-event:hover{border-color:var(--line2)}
+.tl-event.injected{border-left:3px solid var(--red);background:rgba(248,113,113,0.04)}
+.tl-event.anomalous{border-left:3px solid var(--amber);background:rgba(251,191,36,0.04)}
+.tl-t{font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:28px;margin-top:1px}
+.tl-body{flex:1;min-width:0}
+.tl-agents{font-size:11px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.tl-msg{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-score{font-family:var(--font-mono);font-size:11px;font-weight:700;flex-shrink:0}
+
+/* AGENT PANEL */
+.agent-panel{background:var(--card2);border:1px solid var(--line2);border-radius:var(--r2);padding:14px}
+.ap-name{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:3px}
+.ap-section{margin-bottom:12px}
+.ap-section-lbl{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.ap-belief-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.ap-belief-agent{font-size:11px;font-weight:600;min-width:72px;font-family:var(--font-mono)}
+.ap-trust-bar{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.ap-trust-fill{height:100%;border-radius:2px;transition:width 0.4s}
+.ap-trust-val{font-family:var(--font-mono);font-size:10px;font-weight:700;min-width:28px;text-align:right}
+.ap-narrative{background:var(--ink);border-left:2px solid var(--indigo);border-radius:0 var(--r) var(--r) 0;padding:8px 12px;font-size:11px;line-height:1.7;color:var(--muted);margin-bottom:10px}
+.ap-flags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.ap-flag{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:var(--red-dim);color:#fca5a5;border:1px solid rgba(248,113,113,0.3)}
+.ap-score-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ap-score-num{font-size:26px;font-weight:700;font-family:var(--font-mono);line-height:1}
+.ap-score-bar-wrap{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.ap-score-bar{height:100%;border-radius:3px;transition:width 0.4s}
+
+/* TRUST CHART */
+.chart-wrap{position:relative;height:260px}
+
+/* HEATMAP */
+.hm-cell{border-radius:3px;transition:all 0.2s;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--font-mono)}
+.hm-axis-label{font-size:10px;color:var(--muted);text-align:center;padding:2px}
+.hm-row-label{font-size:10px;color:var(--muted);font-family:var(--font-mono);display:flex;align-items:center;white-space:nowrap;padding-right:6px}
+.trust-heat-wrap{overflow-x:auto}
+
+/* DIFF */
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.diff-pane{border-radius:var(--r);overflow:hidden}
+.diff-head{padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:0.04em}
+.diff-head.orig{background:rgba(52,211,153,0.15);color:#34d399}
+.diff-head.injd{background:rgba(248,113,113,0.15);color:#f87171}
+.diff-body{padding:12px;background:var(--surface);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--r) var(--r);font-family:var(--font-mono);font-size:11px;line-height:1.9;min-height:140px;white-space:pre-wrap;word-break:break-word;max-height:340px;overflow-y:auto}
+.inj-payload{display:block;margin-top:10px;background:rgba(248,113,113,0.15);color:#fca5a5;border:1px solid rgba(248,113,113,0.35);border-radius:4px;padding:6px 10px;font-size:11px}
+
+/* PLAYBACK */
+.pb-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:14px;margin-bottom:16px}
+.pb-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pb-btn{width:34px;height:34px;border-radius:50%;background:var(--card2);border:1px solid var(--line);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s;flex-shrink:0}
+.pb-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.pb-btn.playing{background:var(--cyan);border-color:var(--cyan);color:var(--ink)}
+.pb-info{flex:1}
+.pb-label{font-size:10px;color:var(--muted);margin-bottom:2px}
+.pb-tick{font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)}
+.pb-slider{width:100%;accent-color:var(--cyan);cursor:pointer;height:4px}
+.speed-btns{display:flex;gap:4px;flex-shrink:0}
+.speed-btn{padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;background:var(--ink);color:var(--muted);border:1px solid var(--line);transition:all 0.12s;font-family:var(--font-mono)}
+.speed-btn.active{background:var(--cyan);color:var(--ink);border-color:var(--cyan)}
+.live-event-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;transition:border-color 0.3s;min-height:90px}
+.live-event-card.injected{border-color:var(--red);background:var(--red-dim)}
+.live-event-card.anomalous{border-color:var(--amber);background:var(--amber-dim)}
+.le-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.le-t{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+.le-agents{font-size:12px;font-weight:600}
+.le-score{margin-left:auto;font-family:var(--font-mono);font-size:12px;font-weight:700}
+.le-msg{font-size:11px;color:var(--muted);line-height:1.6}
+
+/* INTERVENTIONS */
+.sim-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.sim-btn{padding:8px 16px;border-radius:var(--r);font-size:11px;font-weight:600;border:1px solid var(--line2);background:var(--card2);color:var(--muted);transition:all 0.15s}
+.sim-btn:hover,.sim-btn.active-sim{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,0.06)}
+.sim-result{background:var(--card2);border:1px solid var(--line2);border-radius:var(--r2);padding:16px}
+.sim-metric{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sim-metric-lbl{font-size:11px;color:var(--muted);min-width:120px}
+.sim-bar-wrap{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.sim-bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
+.sim-metric-val{font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:36px;text-align:right}
+
+/* QA */
+.qa-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:16px}
+.qa-textarea{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;color:var(--text);resize:none;outline:none;line-height:1.6;transition:border-color 0.15s;font-size:13px}
+.qa-textarea:focus{border-color:var(--cyan)}
+.qa-btn{background:var(--cyan);color:var(--ink);padding:8px 22px;border-radius:var(--r);font-weight:700;font-size:12px;margin-top:8px;letter-spacing:0.03em;transition:all 0.15s}
+.qa-btn:hover{background:#06b6d4;transform:translateY(-1px)}
+.qa-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.qa-answer{background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:14px;font-size:13px;line-height:1.8;margin-top:12px;white-space:pre-wrap;border-left:3px solid var(--indigo)}
+.qa-example{display:inline-block;margin:3px;padding:4px 10px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r);font-size:11px;color:var(--muted);cursor:pointer;transition:all 0.12s}
+.qa-example:hover{border-color:var(--cyan);color:var(--text)}
+
+/* MISC */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--muted);text-align:center;padding:48px;font-size:13px;line-height:1.8}
+.section-lbl{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.two-col{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
+.tag{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.tag-green{background:var(--green-dim);color:var(--green)}.tag-red{background:var(--red-dim);color:var(--red)}.tag-amber{background:var(--amber-dim);color:var(--amber)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">T∅M</div>
+    <span class="logo-text">MAS-ToM Observatory</span>
+    <span style="color:var(--dim);margin:0 4px">·</span>
+    <span class="logo-sub">Security Sensemaking Dashboard</span>
+  </div>
+  <div class="topbar-right">
+    <div class="live-indicator">
+      <div class="pulse"></div>
+      <span id="top-status">Loading scenarios…</span>
+    </div>
+    <div style="color:var(--dim);font-size:10px">Condition:</div>
+    <div class="cond-toggle">
+      <button class="cond-btn ca" id="cb-a" onclick="setCond('raw')">A — Raw</button>
+      <button class="cond-btn" id="cb-b" onclick="setCond('annotated')">B — ToM</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-label">Scenarios</div>
+      <input class="search-input" id="f-search" placeholder="Search scenario ID…" oninput="renderList()"/>
+      <select class="filter-select" id="f-attack" onchange="renderList()">
+        <option value="">All attacks</option>
+        <option value="collusion">Collusion</option>
+        <option value="mitm">MITM</option>
+        <option value="deception">Deception</option>
+        <option value="baseline">Baseline</option>
+      </select>
+      <select class="filter-select" id="f-topo" onchange="renderList()">
+        <option value="">All topologies</option>
+        <option value="hierarchical">Hierarchical</option>
+        <option value="star">Star</option>
+        <option value="ring">Ring</option>
+        <option value="fully_connected">Fully connected</option>
+      </select>
+      <select class="filter-select" id="f-task" onchange="renderList()">
+        <option value="">All tasks</option>
+        <option value="qa_pipeline">QA pipeline</option>
+        <option value="code_review">Code review</option>
+        <option value="research_synthesis">Research synthesis</option>
+      </select>
+    </div>
+    <div class="s-list" id="s-list">
+      <div class="empty" style="padding:32px 16px"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">⬡</div>
+      <div class="drop-title">MAS-ToM Observatory</div>
+      <div class="drop-sub">Select a scenario from the sidebar to begin analysis</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const G={scenarios:[],current:null,cid:null,cond:'raw',tab:'overview',selectedT:null,playing:false,playT:0,playSpeed:1,playTimer:null,trustChart:null,anomalyChart:null,simActive:null};
+const AGENT_COLORS=['#22d3ee','#818cf8','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6','#4ade80','#fb923c','#38bdf8'];
+const stateColor=s=>({stable:'#34d399',misled:'#fbbf24',conflicted:'#a78bfa',deceptive:'#f87171',cascading:'#f472b6',quarantined:'#637089'}[s]||'#637089');
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function scoreColor(s){return s>0.7?'#f87171':s>0.4?'#fbbf24':'#34d399';}
+function agentColor(id){const i=parseInt(id?.replace(/\D/g,''))||0;return AGENT_COLORS[i%AGENT_COLORS.length];}
+function shortId(id){return id?.replace('agent_','A').replace('chat_manager','CM')||id;}
+
+/* ═══ BOOT ═══ */
+async function boot(){
+  try{
+    const d=await(await fetch('/api/scenarios')).json();
+    G.scenarios=d.scenarios||[];
+    document.getElementById('top-status').textContent=`${G.scenarios.length} scenarios loaded`;
+    renderList();
+  }catch(e){
+    document.getElementById('top-status').textContent='API error';
+    document.getElementById('s-list').innerHTML=`<div class="empty" style="color:var(--red)">API error: ${e.message}</div>`;
+  }
+}
+
+/* ═══ CONDITION ═══ */
+function setCond(c){
+  G.cond=c;
+  document.getElementById('cb-a').className='cond-btn'+(c==='raw'?' ca':'');
+  document.getElementById('cb-b').className='cond-btn'+(c==='annotated'?' cb':'');
+  if(G.cid)loadScenario(G.cid);
+}
+
+/* ═══ LIST ═══ */
+function renderList(){
+  const fs=document.getElementById('f-search').value.toLowerCase();
+  const fat=document.getElementById('f-attack').value;
+  const ft=document.getElementById('f-topo').value;
+  const fk=document.getElementById('f-task').value;
+  const filtered=G.scenarios.filter(s=>
+    (!fs||s.scenario_id.toLowerCase().includes(fs))&&
+    (!fat||s.attack_type===fat)&&(!ft||s.topology===ft)&&(!fk||s.task===fk));
+  const el=document.getElementById('s-list');
+  if(!filtered.length){el.innerHTML='<div class="empty">No matches</div>';return;}
+  el.innerHTML=filtered.map(s=>{
+    const injCount=(s.injected_count||0);
+    return`<div class="s-item ${s.scenario_id===G.cid?'active':''}" onclick="loadScenario('${s.scenario_id}')">
+      <div class="s-item-id">${s.scenario_id}</div>
+      <div class="s-item-badges">
+        <span class="badge b-${s.attack_type}">${s.attack_type}</span>
+        <span class="badge b-topo">${s.topology}</span>
+        ${s.tom_annotated?'<span class="badge b-tom">ToM</span>':''}
+      </div>
+      <div class="s-item-stats">${s.n_agents}a · ${s.event_count}ev${injCount?` · <span style="color:#f87171">${injCount} inj</span>`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══ LOAD SCENARIO ═══ */
+async function loadScenario(id){
+  G.cid=id;G.tab='overview';G.playT=0;stopPlayback();
+  renderList();
+  document.getElementById('content').innerHTML='<div class="drop-zone"><div class="spinner"></div></div>';
+  try{
+    const d=await(await fetch(`/api/scenario/${id}?mode=${G.cond}`)).json();
+    G.current=d;
+    renderDashboard();
+  }catch(e){
+    document.getElementById('content').innerHTML=`<div class="drop-zone"><div style="color:var(--red)">Load failed: ${esc(e.message)}</div></div>`;
+  }
+}
+
+/* ═══ DASHBOARD ═══ */
+function renderDashboard(){
+  const sc=G.current;if(!sc)return;
+  const evs=sc.events||[];
+  const hasToM=G.cond==='annotated'&&evs.some(e=>e.tom&&(e.tom.anomaly_score>0||e.tom.narrative));
+  const injCount=evs.filter(e=>e.attack&&e.attack.is_injected).length;
+  const peakAnomaly=hasToM?Math.max(...evs.map(e=>e.tom?.anomaly_score||0)):0;
+  const bridgeCount=computeBridgeAgents(evs).length;
+  const TABS=hasToM
+    ?[['overview','Overview'],['network','Social Graph'],['playback','Live Playback'],['trust','Trust Evolution'],['diff','Attack Diff'],['interventions','Interventions'],['qa','Ask Claude']]
+    :[['overview','Overview'],['network','Social Graph'],['diff','Attack Diff'],['qa','Ask']];
+
+  document.getElementById('content').innerHTML=`
+    <div class="sc-header">
+      <div class="sc-id">${sc.scenario_id}</div>
+      <div class="sc-badges">
+        <span class="badge b-${sc.attack_type}">${sc.attack_type}</span>
+        <span class="badge b-topo">${sc.topology}</span>
+        <span class="badge b-task">${(sc.task||'').replace(/_/g,' ')}</span>
+        ${hasToM?'<span class="badge b-tom">ToM annotated</span>':''}
+        ${G.cond==='raw'&&sc.attack_type!=='baseline'?'<span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">Switch to B→ToM for full analysis</span>':''}
+      </div>
+      <div class="kpi-row">
+        <div class="kpi cyan"><div class="kpi-val">${evs.length}</div><div class="kpi-lbl">Events</div></div>
+        <div class="kpi violet"><div class="kpi-val">${sc.n_agents}</div><div class="kpi-lbl">Agents</div></div>
+        ${injCount?`<div class="kpi danger"><div class="kpi-val">${injCount}</div><div class="kpi-lbl">Injected</div></div>`:''}
+        ${hasToM?`<div class="kpi ${peakAnomaly>0.7?'danger':peakAnomaly>0.4?'warning':'success'}"><div class="kpi-val">${peakAnomaly.toFixed(2)}</div><div class="kpi-lbl">Peak anomaly</div></div>`:''}
+        ${bridgeCount?`<div class="kpi warning"><div class="kpi-val">${bridgeCount}</div><div class="kpi-lbl">Bridge nodes</div></div>`:''}
+        <div class="kpi"><div class="kpi-val" style="font-size:13px;color:${sc.attack_type==='baseline'?'var(--green)':'var(--red)'}">${sc.attack_type==='baseline'?'Clean':'ATTACK'}</div><div class="kpi-lbl">Status</div></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs">
+      ${TABS.map(([id,lbl])=>`<button class="tab ${G.tab===id?'active':''}" onclick="switchTab('${id}')">${lbl}</button>`).join('')}
+    </div>
+    <div class="panels" id="panels">
+      ${TABS.map(([id])=>`<div class="panel ${G.tab===id?'active':''}" id="panel-${id}"></div>`).join('')}
+    </div>
+  `;
+  renderTab(G.tab);
+}
+
+function switchTab(tab){
+  if(G.tab===tab)return;
+  stopPlayback();G.tab=tab;
+  document.querySelectorAll('.tab').forEach(t=>{const id=t.getAttribute('onclick').match(/'([^']+)'/)?.[1];t.classList.toggle('active',id===tab);});
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const panel=document.getElementById('panel-'+tab);
+  if(panel){panel.classList.add('active');renderTab(tab);}
+}
+
+function renderTab(tab){
+  const panel=document.getElementById('panel-'+tab);if(!panel)return;
+  const evs=G.current?.events||[];
+  switch(tab){
+    case 'overview':panel.innerHTML=overviewHTML(evs);initOverviewCharts(evs);break;
+    case 'network':panel.innerHTML=networkHTML();initNetwork(evs);break;
+    case 'playback':panel.innerHTML=playbackHTML();initPlayback(evs);break;
+    case 'trust':panel.innerHTML=trustHTML();initTrustChart(evs);break;
+    case 'diff':panel.innerHTML=diffHTML(evs);break;
+    case 'interventions':panel.innerHTML=interventionsHTML(evs);break;
+    case 'qa':panel.innerHTML=qaHTML();break;
+  }
+}
+
+/* ═══ OVERVIEW TAB ═══ */
+function overviewHTML(evs){
+  const hasToM=G.cond==='annotated'&&evs.some(e=>e.tom&&e.tom.anomaly_score>0);
+  const agentStates=computeAgentStates(evs);
+  const stateCounts={stable:0,misled:0,conflicted:0,deceptive:0,cascading:0};
+  Object.values(agentStates).forEach(s=>{if(stateCounts[s]!==undefined)stateCounts[s]++;});
+  const injected=evs.filter(e=>e.attack?.is_injected);
+  const topAnomaly=[...evs].filter(e=>e.tom?.anomaly_score>0).sort((a,b)=>(b.tom.anomaly_score||0)-(a.tom.anomaly_score||0)).slice(0,5);
+  const phase=injected.length===0?'Clean':injected[0].t<evs.length*0.3?'Early injection':injected[0].t<evs.length*0.7?'Mid-scenario':'Late injection';
+
+  return`
+    ${hasToM?`
+    <div class="section-lbl">Agent mental state distribution</div>
+    <div class="state-grid">
+      ${Object.entries(stateCounts).map(([state,count])=>`
+        <div class="state-chip s-${state}">
+          <div class="state-chip-name">${state.charAt(0).toUpperCase()+state.slice(1)}</div>
+          <div class="state-chip-count">${count}</div>
+        </div>`).join('')}
+    </div>`:''}
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Attack timeline — events in sequence</span>
+            <span class="card-sub">${injected.length} injection${injected.length!==1?'s':''} · Phase: ${phase}</span>
+          </div>
+          <div class="tl-events">
+            ${evs.map(e=>{const score=e.tom?.anomaly_score||0;const sc=scoreColor(score);
+            return`<div class="tl-event ${e.attack?.is_injected?'injected':score>0.4?'anomalous':''}" onclick="overviewSelectEvent(${e.t})">
+              <div class="tl-t">t=${e.t}</div>
+              <div class="tl-body">
+                <div class="tl-agents">
+                  <span style="color:${agentColor(e.sender)}">${shortId(e.sender)}</span>
+                  <span style="color:var(--muted);font-size:10px">→</span>
+                  <span style="color:${agentColor(e.receiver)}">${shortId(e.receiver)}</span>
+                  ${e.attack?.is_injected?'<span class="badge b-injected">INJ</span>':''}
+                </div>
+                <div class="tl-msg">${esc(e.message)}</div>
+              </div>
+              ${hasToM?`<div class="tl-score" style="color:${sc}">${score.toFixed(2)}</div>`:''}
+            </div>`;}).join('')}
+          </div>
+        </div>
+        ${hasToM?`<div class="card"><div class="card-head"><span class="card-title">Anomaly score over time</span><span class="card-sub">Click bar to inspect event</span></div><div style="height:160px"><canvas id="anomaly-chart-ov"></canvas></div></div>`:''}
+      </div>
+      <div>
+        <div class="agent-panel" id="agent-panel">
+          <div style="font-size:12px;color:var(--muted)">Select an event or agent to inspect</div>
+        </div>
+        ${hasToM&&topAnomaly.length?`
+        <div class="card" style="margin-top:16px">
+          <div class="card-head"><span class="card-title">Top anomaly events</span></div>
+          ${topAnomaly.map(e=>`<div onclick="overviewSelectEvent(${e.t})" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);cursor:pointer;margin-bottom:4px;background:var(--card2);border:1px solid var(--line);transition:border-color 0.12s" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='var(--line)'">
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);min-width:28px">t=${e.t}</span>
+            <span style="font-size:11px;font-weight:600;flex:1">${shortId(e.sender)} → ${shortId(e.receiver)}</span>
+            ${e.attack?.is_injected?'<span class="badge b-injected">INJ</span>':''}
+            <div style="width:60px;height:4px;border-radius:2px;background:var(--line);overflow:hidden"><div style="height:100%;border-radius:2px;width:${(e.tom?.anomaly_score||0)*100}%;background:${scoreColor(e.tom?.anomaly_score||0)}"></div></div>
+            <span style="font-family:var(--font-mono);font-size:10px;color:${scoreColor(e.tom?.anomaly_score||0)};min-width:30px">${(e.tom?.anomaly_score||0).toFixed(2)}</span>
+          </div>`).join('')}
+        </div>`:''}
+        ${!hasToM&&G.cond==='raw'?`<div class="card" style="margin-top:16px;background:rgba(34,211,238,0.05);border-color:rgba(34,211,238,0.2)"><div style="font-size:12px;color:var(--cyan);font-weight:600;margin-bottom:6px">Enable ToM for deeper insights</div><div style="font-size:11px;color:var(--muted);line-height:1.7">Switch to <strong style="color:var(--cyan)">Condition B — ToM</strong> to unlock agent mental states, belief tracking, anomaly scores, and trust evolution charts.</div><button onclick="setCond('annotated')" style="margin-top:10px;background:var(--cyan);color:var(--ink);padding:6px 14px;border-radius:var(--r);font-weight:700;font-size:11px">Enable ToM →</button></div>`:''}
+      </div>
+    </div>`;
+}
+
+function initOverviewCharts(evs){
+  const ctx=document.getElementById('anomaly-chart-ov');if(!ctx)return;
+  if(G.anomalyChart){G.anomalyChart.destroy();G.anomalyChart=null;}
+  const scores=evs.map(e=>e.tom?.anomaly_score||0);
+  G.anomalyChart=new Chart(ctx,{type:'bar',data:{labels:evs.map(e=>`t${e.t}`),datasets:[{data:scores,backgroundColor:scores.map(s=>s>0.7?'rgba(248,113,113,0.8)':s>0.4?'rgba(251,191,36,0.7)':'rgba(52,211,153,0.6)'),borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Anomaly: ${c.raw?.toFixed(3)}`,afterLabel:c=>evs[c.dataIndex]?.attack?.is_injected?'⚠ INJECTED':''}}},scales:{x:{ticks:{color:'#637089',font:{size:9},maxTicksLimit:20},grid:{color:'#1e293b'}},y:{min:0,max:1,ticks:{color:'#637089',font:{size:9}},grid:{color:'#1e293b'}}},onClick(_,els){if(els.length)overviewSelectEvent(evs[els[0].index]?.t);}}});
+}
+
+function overviewSelectEvent(t){
+  const evs=G.current?.events||[];
+  const e=evs.find(x=>x.t===t);if(!e)return;
+  G.selectedT=t;
+  const panel=document.getElementById('agent-panel');if(!panel)return;
+  const score=e.tom?.anomaly_score||0;const sc=scoreColor(score);
+  panel.innerHTML=`
+    <div class="ap-section">
+      <div class="ap-name">${shortId(e.sender)} → ${shortId(e.receiver)}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:6px">t=${e.t}</div>
+      ${e.attack?.is_injected?'<span class="badge b-injected">⚠ INJECTED MESSAGE</span>':''}
+    </div>
+    <div class="divider"></div>
+    ${e.tom?.narrative?`<div class="ap-section"><div class="ap-section-lbl">ToM interpretation</div><div class="ap-narrative">${esc(e.tom.narrative)}</div></div>`:''}
+    ${e.tom?.anomaly_flags?.length?`<div class="ap-section"><div class="ap-section-lbl">Anomaly signals</div><div class="ap-flags">${e.tom.anomaly_flags.map(f=>`<span class="ap-flag">${f}</span>`).join('')}</div></div>`:''}
+    ${score>0?`<div class="ap-section"><div class="ap-section-lbl">Anomaly score</div><div class="ap-score-row"><div class="ap-score-num" style="color:${sc}">${score.toFixed(3)}</div><div class="ap-score-bar-wrap"><div class="ap-score-bar" style="width:${score*100}%;background:${sc}"></div></div></div></div>`:''}
+    ${(e.tom?.beliefs||[]).length?`<div class="ap-section"><div class="ap-section-lbl">Belief / trust state</div>${e.tom.beliefs.map(b=>{const tc=scoreColor(b.trust_score);return`<div class="ap-belief-row"><div class="ap-belief-agent" style="color:${agentColor(b.target_agent)}">${shortId(b.target_agent)}</div><div class="ap-trust-bar"><div class="ap-trust-fill" style="width:${b.trust_score*100}%;background:${tc}"></div></div><div class="ap-trust-val" style="color:${tc}">${b.trust_score.toFixed(2)}</div></div>`;}).join('')}</div>`:''}
+    <div class="ap-section"><div class="ap-section-lbl">Message</div><div style="background:var(--ink);border-radius:var(--r);padding:10px;font-size:11px;color:var(--muted);max-height:160px;overflow-y:auto;line-height:1.7;white-space:pre-wrap">${esc(e.message)}</div></div>
+  `;
+}
+
+/* ═══ NETWORK TAB ═══ */
+function networkHTML(){
+  return`<div class="card"><div class="card-head"><span class="card-title">Social-cognitive agent network</span><span class="card-sub">Node size = influence · Red dashed = attack injection · Click agent to inspect</span></div><svg id="net-svg"></svg><div id="net-info">Click an agent node to see their communication profile and trust state</div></div><div class="card"><div class="card-head"><span class="card-title">Cascade path analysis</span><span class="card-sub">Top attack propagation routes</span></div><div id="cascade-paths"></div></div>`;
+}
+
+function initNetwork(evs){
+  const svg=d3.select('#net-svg');if(!svg.node())return;
+  const W=svg.node().clientWidth||600,H=400;
+  svg.attr('viewBox',`0 0 ${W} ${H}`);
+  const allAgents=[...new Set(evs.flatMap(e=>[e.sender,e.receiver]).filter(Boolean))];
+  const linkMap={};
+  evs.forEach(e=>{const k=`${e.sender}|${e.receiver}`;if(!linkMap[k])linkMap[k]={source:e.sender,target:e.receiver,count:0,injected:0};linkMap[k].count++;if(e.attack?.is_injected)linkMap[k].injected++;});
+  const nodes=allAgents.map(id=>({id,color:agentColor(id),role:G.current?.agent_specs?.find(s=>s.agent_id===id)?.role||'agent'}));
+  const links=Object.values(linkMap);
+  const defs=svg.append('defs');
+  ['normal','attack'].forEach(type=>{defs.append('marker').attr('id',`arr-${type}`).attr('viewBox','0 0 10 10').attr('refX',30).attr('refY',5).attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto').append('path').attr('d','M0,0L10,5L0,10z').attr('fill',type==='attack'?'#f87171':'#3d5475');});
+  const sim=d3.forceSimulation(nodes).force('link',d3.forceLink(links).id(d=>d.id).distance(90)).force('charge',d3.forceManyBody().strength(-280)).force('center',d3.forceCenter(W/2,H/2)).force('collision',d3.forceCollide(38));
+  const link=svg.append('g').selectAll('line').data(links).join('line').attr('class',d=>`edge${d.injected>0?' attack-edge':''}`).attr('stroke',d=>d.injected>0?'#f87171':'#2d3f5a').attr('stroke-width',d=>Math.min(0.8+d.count*0.25,4)).attr('stroke-dasharray',d=>d.injected>0?'4 3':null).attr('marker-end',d=>`url(#arr-${d.injected>0?'attack':'normal'})`);
+  const node=svg.append('g').selectAll('g').data(nodes).join('g').style('cursor','pointer').call(d3.drag().on('start',(ev,d)=>{if(!ev.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(ev,d)=>{d.fx=ev.x;d.fy=ev.y;}).on('end',(ev,d)=>{if(!ev.active)sim.alphaTarget(0);d.fx=null;d.fy=null;})).on('click',(_,d)=>networkSelectAgent(d.id,evs));
+  node.append('circle').attr('r',d=>d.role==='orchestrator'||d.role==='planner'?22:16).attr('fill',d=>d.color+'18').attr('stroke',d=>d.color).attr('stroke-width',2);
+  node.append('text').attr('class','node-label').text(d=>shortId(d.id)).attr('text-anchor','middle').attr('dy','0.35em').attr('fill',d=>d.color).attr('font-size','10px');
+  node.append('text').text(d=>d.role).attr('text-anchor','middle').attr('dy','2.2em').attr('fill','#637089').attr('font-size','8px');
+  sim.on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);node.attr('transform',d=>`translate(${Math.max(28,Math.min(W-28,d.x))},${Math.max(28,Math.min(H-28,d.y))})`);});
+  window._netFlash=(sender,receiver,isAttack)=>{link.each(function(d){if(d.source.id===sender&&d.target.id===receiver){d3.select(this).attr('stroke',isAttack?'#f87171':'#818cf8').attr('stroke-width',5).transition().duration(700).attr('stroke',d.injected>0?'#f87171':'#2d3f5a').attr('stroke-width',Math.min(0.8+d.count*0.25,4));}});};
+  renderCascadePaths(evs);
+}
+
+function networkSelectAgent(id,evs){
+  const info=document.getElementById('net-info');if(!info)return;
+  const sent=evs.filter(e=>e.sender===id);
+  const injSent=sent.filter(e=>e.attack?.is_injected);
+  const lastBeliefs=(evs.filter(e=>e.sender===id&&e.tom?.beliefs?.length).slice(-1)[0]?.tom?.beliefs)||[];
+  const spec=G.current?.agent_specs?.find(s=>s.agent_id===id);
+  info.innerHTML=`<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:13px;font-weight:600;color:${agentColor(id)};margin-bottom:4px">${id}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Role: ${spec?.role||'agent'}</div>
+      <div style="display:flex;gap:12px;font-size:11px;flex-wrap:wrap">
+        <span>Sent: <strong>${sent.length}</strong></span>
+        <span>Received: <strong>${evs.filter(e=>e.receiver===id).length}</strong></span>
+        ${injSent.length?`<span style="color:var(--red)">Injected: <strong>${injSent.length}</strong></span>`:''}
+      </div>
+    </div>
+    ${lastBeliefs.length?`<div style="flex:1;min-width:200px"><div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Last known trust state</div>${lastBeliefs.slice(0,5).map(b=>{const tc=scoreColor(b.trust_score);return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;min-width:60px;color:${agentColor(b.target_agent)};font-family:var(--font-mono)">${shortId(b.target_agent)}</span><div style="flex:1;height:3px;border-radius:2px;background:var(--line)"><div style="height:100%;border-radius:2px;width:${b.trust_score*100}%;background:${tc}"></div></div><span style="font-size:10px;color:${tc};font-family:var(--font-mono);min-width:28px">${b.trust_score.toFixed(2)}</span></div>`;}).join('')}</div>`:''}
+  </div>`;
+}
+
+function renderCascadePaths(evs){
+  const el=document.getElementById('cascade-paths');if(!el)return;
+  const injected=evs.filter(e=>e.attack?.is_injected);
+  if(!injected.length){el.innerHTML='<div class="empty" style="padding:20px">No injection events in this scenario</div>';return;}
+  el.innerHTML=injected.slice(0,6).map(({e=evs[0],..._},i)=>{
+    const ev=injected[i];
+    const downstream=evs.filter(x=>x.t>ev.t&&x.sender===ev.receiver).slice(0,3);
+    return`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r);margin-bottom:6px">
+      <span style="font-size:10px;color:var(--muted);min-width:28px;font-family:var(--font-mono)">P${i+1}</span>
+      <span style="color:${agentColor(ev.sender)};font-size:11px;font-weight:600">${shortId(ev.sender)}</span>
+      <span style="color:var(--red);font-size:10px">⚡</span>
+      <span style="color:${agentColor(ev.receiver)};font-size:11px;font-weight:600">${shortId(ev.receiver)}</span>
+      ${downstream.map(d=>`<span style="color:var(--muted);font-size:10px">→</span><span style="color:${agentColor(d.receiver)};font-size:11px;font-weight:600">${shortId(d.receiver)}</span>`).join('')}
+      <span class="badge b-injected" style="margin-left:auto">${ev.attack.injection_type}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ═══ PLAYBACK TAB ═══ */
+function playbackHTML(){
+  return`<div class="pb-bar"><div class="pb-top"><button class="pb-btn" onclick="seekPb(-1)">⏮</button><button class="pb-btn" id="pb-play" onclick="togglePb()">▶</button><button class="pb-btn" onclick="seekPb(1)">⏭</button><div class="pb-info"><div class="pb-label">Event position</div><div class="pb-tick" id="pb-tick">t=0</div></div><div class="speed-btns">${[0.5,1,2,4].map(s=>`<button class="speed-btn${G.playSpeed===s?' active':''}" onclick="setPbSpeed(${s})">${s}x</button>`).join('')}</div></div><input type="range" class="pb-slider" id="pb-slider" min="0" max="0" value="0" oninput="scrubPb(parseInt(this.value))"/></div>
+  <div class="grid2" style="margin-bottom:16px"><div class="card"><div class="card-head"><span class="card-title">Current event</span><span id="pb-inj-badge"></span></div><div id="pb-live-event"><div class="empty" style="padding:24px">Press play</div></div></div><div class="card"><div class="card-head"><span class="card-title">ToM snapshot</span><span class="card-sub" id="pb-score-lbl">—</span></div><div id="pb-tom"></div></div></div>
+  <div class="card"><div class="card-head"><span class="card-title">Anomaly timeline</span><span class="card-sub">Click to scrub</span></div><div style="height:140px"><canvas id="pb-anomaly-chart"></canvas></div></div>`;
+}
+
+function initPlayback(evs){
+  const slider=document.getElementById('pb-slider');if(slider)slider.max=Math.max(0,evs.length-1);
+  const ctx=document.getElementById('pb-anomaly-chart');if(!ctx)return;
+  const scores=evs.map(e=>e.tom?.anomaly_score||0);
+  new Chart(ctx,{type:'bar',data:{labels:evs.map(e=>`t${e.t}`),datasets:[{data:scores,backgroundColor:scores.map((s,i)=>i===G.playT?'rgba(34,211,238,0.9)':s>0.7?'rgba(248,113,113,0.8)':s>0.4?'rgba(251,191,36,0.7)':'rgba(52,211,153,0.5)'),borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#637089',font:{size:9},maxTicksLimit:20},grid:{color:'#1e293b'}},y:{min:0,max:1,ticks:{color:'#637089',font:{size:9}},grid:{color:'#1e293b'}}},onClick(_,els){if(els.length)scrubPb(els[0].index);}}});
+  renderPbFrame(evs,G.playT);
+}
+
+function renderPbFrame(evs,idx){
+  idx=Math.max(0,Math.min(idx,evs.length-1));G.playT=idx;
+  const e=evs[idx];if(!e)return;
+  const slider=document.getElementById('pb-slider');if(slider)slider.value=idx;
+  const tick=document.getElementById('pb-tick');if(tick)tick.textContent=`t=${e.t}  (${idx+1}/${evs.length})`;
+  if(window._netFlash)_netFlash(e.sender,e.receiver,e.attack?.is_injected);
+  const score=e.tom?.anomaly_score||0;const sc=scoreColor(score);
+  const injBadge=document.getElementById('pb-inj-badge');
+  if(injBadge)injBadge.innerHTML=e.attack?.is_injected?'<span class="badge b-injected">INJECTED</span>':'';
+  const liveEl=document.getElementById('pb-live-event');
+  if(liveEl)liveEl.innerHTML=`<div class="live-event-card ${e.attack?.is_injected?'injected':score>0.4?'anomalous':''}"><div class="le-top"><span class="le-t">t=${e.t}</span><span class="le-agents"><span style="color:${agentColor(e.sender)}">${shortId(e.sender)}</span><span style="color:var(--muted);margin:0 4px;font-size:10px">→</span><span style="color:${agentColor(e.receiver)}">${shortId(e.receiver)}</span></span>${score>0?`<div class="le-score" style="color:${sc}">${score.toFixed(3)}</div>`:''}</div><div class="le-msg">${esc(e.message)}</div>${e.attack?.is_injected&&e.attack.original_message?`<div style="margin-top:8px;padding:6px 8px;background:var(--red-dim);border-radius:4px;font-size:10px"><span style="color:var(--muted)">Original: </span><span style="color:#fca5a5;font-family:var(--font-mono)">${esc((e.attack.original_message||'').slice(0,160))}…</span></div>`:''}</div>`;
+  const tomEl=document.getElementById('pb-tom');
+  const scoreLbl=document.getElementById('pb-score-lbl');
+  if(scoreLbl)scoreLbl.textContent=score>0?`Anomaly: ${score.toFixed(3)}`:'No anomaly';
+  if(tomEl){
+    if(e.tom?.narrative){tomEl.innerHTML=`<div class="ap-narrative" style="margin-bottom:10px">${esc(e.tom.narrative)}</div>${e.tom.anomaly_flags?.length?`<div class="ap-flags">${e.tom.anomaly_flags.map(f=>`<span class="ap-flag">${f}</span>`).join('')}</div>`:''}${(e.tom.beliefs||[]).length?`<div style="margin-top:10px">${e.tom.beliefs.map(b=>{const tc=scoreColor(b.trust_score);return`<div class="ap-belief-row"><div class="ap-belief-agent" style="color:${agentColor(b.target_agent)}">${shortId(b.target_agent)}</div><div class="ap-trust-bar"><div class="ap-trust-fill" style="width:${b.trust_score*100}%;background:${tc}"></div></div><div class="ap-trust-val" style="color:${tc}">${b.trust_score.toFixed(2)}</div></div>`;}).join('')}</div>`:''}`;}
+    else{tomEl.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px">No ToM annotation for this event</div>';}
+  }
+}
+
+function togglePb(){G.playing?stopPlayback():startPlayback();}
+function startPlayback(){G.playing=true;const btn=document.getElementById('pb-play');if(btn){btn.textContent='⏸';btn.classList.add('playing');}const evs=G.current?.events||[];G.playTimer=setInterval(()=>{if(G.playT>=evs.length-1){stopPlayback();return;}G.playT++;renderPbFrame(evs,G.playT);},1000/G.playSpeed);}
+function stopPlayback(){G.playing=false;if(G.playTimer){clearInterval(G.playTimer);G.playTimer=null;}const btn=document.getElementById('pb-play');if(btn){btn.textContent='▶';btn.classList.remove('playing');}}
+function seekPb(dir){stopPlayback();scrubPb(G.playT+dir);}
+function scrubPb(idx){stopPlayback();renderPbFrame(G.current?.events||[],idx);}
+function setPbSpeed(s){G.playSpeed=s;const was=G.playing;stopPlayback();document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active',parseFloat(b.textContent)===s));if(was)startPlayback();}
+
+/* ═══ TRUST EVOLUTION TAB ═══ */
+function trustHTML(){
+  return`<div class="card"><div class="card-head"><span class="card-title">Trust score evolution — per-agent over time</span><span class="card-sub">Diverging lines = social-cognitive fracture signal</span></div><div class="chart-wrap"><canvas id="trust-chart"></canvas></div></div>
+  <div class="grid2"><div class="card"><div class="card-head"><span class="card-title">Belief divergence — average trust per agent</span></div><div style="height:220px"><canvas id="bdc"></canvas></div></div><div class="card"><div class="card-head"><span class="card-title">Trust heatmap — final state</span><span class="card-sub">Sender → Target</span></div><div id="trust-heatmap"></div></div></div>`;
+}
+
+function initTrustChart(evs){
+  const targets=[...new Set(evs.flatMap(e=>(e.tom?.beliefs||[]).map(b=>b.target_agent)))];
+  const datasets=targets.map((target,i)=>({label:shortId(target),data:evs.map(e=>{const b=(e.tom?.beliefs||[]).find(x=>x.target_agent===target);return b?b.trust_score:null;}),borderColor:AGENT_COLORS[i%AGENT_COLORS.length],backgroundColor:'transparent',pointRadius:2,pointBackgroundColor:AGENT_COLORS[i%AGENT_COLORS.length],tension:0.35,spanGaps:true,borderWidth:1.5}));
+  const ctx=document.getElementById('trust-chart');if(!ctx)return;
+  if(G.trustChart)G.trustChart.destroy();
+  G.trustChart=new Chart(ctx,{type:'line',data:{labels:evs.map(e=>`t${e.t}`),datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#637089',font:{size:10},boxWidth:10}}},scales:{x:{ticks:{color:'#637089',font:{size:9},maxTicksLimit:20},grid:{color:'#1e293b'}},y:{min:0,max:1,ticks:{color:'#637089',font:{size:9}},grid:{color:'#1e293b'},title:{display:true,text:'Trust score',color:'#637089',font:{size:10}}}}}});
+  const bdCtx=document.getElementById('bdc');
+  if(bdCtx){const avgTrusts=targets.map(target=>{const vals=evs.flatMap(e=>(e.tom?.beliefs||[]).filter(b=>b.target_agent===target).map(b=>b.trust_score));return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;});new Chart(bdCtx,{type:'bar',data:{labels:targets.map(shortId),datasets:[{data:avgTrusts,backgroundColor:avgTrusts.map(s=>s<0.4?'rgba(248,113,113,0.7)':s<0.6?'rgba(251,191,36,0.7)':'rgba(52,211,153,0.7)'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#637089',font:{size:9}},grid:{color:'#1e293b'}},y:{min:0,max:1,ticks:{color:'#637089',font:{size:9}},grid:{color:'#1e293b'}}}}});}
+  const hmEl=document.getElementById('trust-heatmap');if(!hmEl)return;
+  const senders=[...new Set(evs.filter(e=>e.tom?.beliefs?.length).map(e=>e.sender))].slice(0,6);
+  const tgts=targets.slice(0,6);
+  if(!senders.length||!tgts.length){hmEl.innerHTML='<div style="color:var(--muted);font-size:11px;padding:12px">Insufficient belief data</div>';return;}
+  const cellSize=34;
+  let html=`<div class="trust-heat-wrap"><table style="border-collapse:collapse;font-size:10px"><tr><td></td>${tgts.map(t=>`<td class="hm-axis-label">${shortId(t)}</td>`).join('')}</tr>`;
+  senders.forEach(sender=>{
+    html+=`<tr><td class="hm-row-label">${shortId(sender)}</td>`;
+    tgts.forEach(target=>{const lb=evs.filter(e=>e.sender===sender&&e.tom?.beliefs?.some(b=>b.target_agent===target)).slice(-1)[0]?.tom?.beliefs?.find(b=>b.target_agent===target);const val=lb?.trust_score;const c=val==null?'var(--card2)':val<0.4?`rgba(248,113,113,${0.3+val*0.7})`:val<0.6?`rgba(251,191,36,${0.2+val*0.6})`:`rgba(52,211,153,${0.15+val*0.7})`;const tc=val==null?'var(--muted)':val<0.4?'#fca5a5':val<0.6?'#fbbf24':'#34d399';html+=`<td style="padding:2px"><div class="hm-cell" style="width:${cellSize}px;height:${cellSize}px;background:${c};color:${tc}">${val!=null?val.toFixed(1):'—'}</div></td>`;});
+    html+=`</tr>`;
+  });
+  html+=`</table></div>`;
+  hmEl.innerHTML=html;
+}
+
+/* ═══ DIFF TAB ═══ */
+function diffHTML(evs){
+  const injected=evs.filter(e=>e.attack?.is_injected);
+  if(!injected.length)return`<div class="card"><div class="empty">No injected messages in this scenario.<br><span style="color:var(--muted)">This may be a baseline scenario or the attack did not fire.</span></div></div>`;
+  const first=injected[0];
+  return`<div class="card"><div class="card-head"><span class="card-title">Attack injection diff viewer</span><span class="card-sub">${injected.length} injected message${injected.length!==1?'s':''} detected</span></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap"><span style="color:var(--muted);font-size:11px">Select event:</span>
+  <select class="filter-select" style="width:auto;max-width:380px" onchange="renderDiffView(parseInt(this.value))">${injected.map(e=>`<option value="${e.t}">t=${e.t} · ${shortId(e.sender)}→${shortId(e.receiver)} · ${e.attack.injection_type}</option>`).join('')}</select></div>
+  <div id="diff-content">${diffContent(first)}</div></div>
+  <div id="diff-tom-card" class="card" style="${first.tom?.narrative?'':'display:none'}"><div class="card-head"><span class="card-title">ToM interpretation of this injection</span></div><div id="diff-tom">${diffTom(first)}</div></div>`;
+}
+
+function diffContent(e){const orig=e.attack?.original_message||e.message;const added=e.message.replace(orig,'').trim();return`<div style="margin-bottom:12px;font-size:11px;color:var(--muted)"><strong style="color:var(--text)">t=${e.t}</strong> · <span style="color:${agentColor(e.sender)}">${shortId(e.sender)}</span> → <span style="color:${agentColor(e.receiver)}">${shortId(e.receiver)}</span> · Type: <span style="color:var(--amber)">${e.attack.injection_type}</span></div>
+  <div class="diff-grid"><div class="diff-pane"><div class="diff-head orig">ORIGINAL MESSAGE</div><div class="diff-body">${esc(orig)}</div></div><div class="diff-pane"><div class="diff-head injd">RECEIVED BY ${shortId(e.receiver)} (INJECTED)</div><div class="diff-body">${esc(orig)}${added?`<span class="inj-payload">⚠ INJECTED PAYLOAD:\n${esc(added)}</span>`:''}</div></div></div>`;}
+function diffTom(e){if(!e.tom?.narrative)return'';return`<div class="ap-narrative">${esc(e.tom.narrative)}</div>${e.tom.anomaly_flags?.length?`<div class="ap-flags" style="margin-top:8px">${e.tom.anomaly_flags.map(f=>`<span class="ap-flag">${f}</span>`).join('')}</div>`:''}<div style="margin-top:10px;font-size:12px">Anomaly score: <strong style="color:${scoreColor(e.tom.anomaly_score||0)};font-family:var(--font-mono)">${(e.tom.anomaly_score||0).toFixed(3)}</strong></div>`;}
+function renderDiffView(t){const evs=G.current?.events||[];const e=evs.find(x=>x.t===t);if(!e)return;const dc=document.getElementById('diff-content');if(dc)dc.innerHTML=diffContent(e);const dtc=document.getElementById('diff-tom-card');const dt=document.getElementById('diff-tom');if(dtc)dtc.style.display=e.tom?.narrative?'block':'none';if(dt)dt.innerHTML=diffTom(e);}
+
+/* ═══ INTERVENTIONS TAB ═══ */
+function interventionsHTML(evs){
+  const bridgeAgents=computeBridgeAgents(evs);
+  const agentStates=computeAgentStates(evs);
+  const highRisk=Object.entries(agentStates).filter(([,s])=>s==='deceptive'||s==='cascading').map(([id])=>id);
+  const injected=evs.filter(e=>e.attack?.is_injected);
+  const peakAnomaly=Math.max(...evs.map(e=>e.tom?.anomaly_score||0));
+  const types=[...new Set(injected.map(e=>e.attack.injection_type))];
+  const targets=[...new Set(injected.flatMap(e=>e.attack.attack_targets||[]))];
+  return`<div class="grid2">
+    <div>
+      <div class="card"><div class="card-head"><span class="card-title">Intervention simulator</span><span class="card-sub">Select action · see projected impact</span></div>
+        <div class="sim-actions">${[['quarantine','Quarantine node'],['freeze_mem','Freeze memory sync'],['reduce_trust','Reduce trust weight'],['reroute','Reroute topology'],['downgrade_tools','Downgrade tool access']].map(([id,lbl])=>`<button class="sim-btn${G.simActive===id?' active-sim':''}" onclick="simSelect('${id}')">${lbl}</button>`).join('')}</div>
+        <div class="sim-result" id="sim-result"><div style="color:var(--muted);font-size:12px">Select an intervention above to see projected impact</div></div>
+      </div>
+      <div class="card"><div class="card-head"><span class="card-title">Bridge agents</span><span class="card-sub">High-leverage intervention targets</span></div>
+        ${bridgeAgents.length?bridgeAgents.map(id=>`<div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r);margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:${agentColor(id)};flex-shrink:0"></div><div style="flex:1"><div style="font-size:12px;font-weight:600;font-family:var(--font-mono);color:${agentColor(id)}">${id}</div><div style="font-size:10px;color:var(--muted)">${G.current?.agent_specs?.find(s=>s.agent_id===id)?.role||'agent'}</div></div><span class="tag tag-amber">bridge</span></div>`).join(''):`<div class="empty" style="padding:20px">No bridge agents identified</div>`}
+      </div>
+    </div>
+    <div>
+      <div class="card"><div class="card-head"><span class="card-title">High-risk agents</span><span class="card-sub">Deceptive or cascading states</span></div>
+        ${highRisk.length?highRisk.map(id=>{const state=agentStates[id];return`<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r);margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:${stateColor(state)}"></div><div style="flex:1"><div style="font-size:12px;font-weight:600;font-family:var(--font-mono);color:${agentColor(id)}">${id}</div><div style="font-size:10px;color:var(--muted)">${G.current?.agent_specs?.find(s=>s.agent_id===id)?.role||'agent'}</div></div><span class="tag" style="background:${stateColor(state)}22;color:${stateColor(state)}">${state}</span></div>`;}).join(''):`<div class="empty" style="padding:20px">No high-risk agents detected</div>`}
+      </div>
+      <div class="card"><div class="card-head"><span class="card-title">Attack summary</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Attack type</span><span class="badge b-${G.current?.attack_type}">${G.current?.attack_type||'—'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Injections</span><strong style="color:var(--red)">${injected.length}</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Injection types</span><span>${types.join(', ')||'—'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Targets</span><span style="color:var(--amber)">${targets.map(shortId).join(', ')||'—'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">First injection at</span><span style="font-family:var(--font-mono)">t=${injected[0]?.t??'—'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Peak anomaly score</span><strong style="color:${scoreColor(peakAnomaly)};font-family:var(--font-mono)">${peakAnomaly.toFixed(3)}</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+const SIM_DATA={quarantine:{spread:'85%',cost:'High',confidence:'78%',desc:'Isolate the bridge node from all communication channels. Stops cascade but may degrade task performance significantly.'},freeze_mem:{spread:'72%',cost:'Medium',confidence:'82%',desc:'Freeze memory synchronisation for flagged agents. Prevents belief contamination spreading through shared memory.'},reduce_trust:{spread:'75%',cost:'Low',confidence:'85%',desc:'Reduce trust weights from the identified source toward downstream agents. Minimal performance cost, high containment.'},reroute:{spread:'55%',cost:'Medium',confidence:'69%',desc:'Reroute communication topology to bypass compromised path. Effective but requires topology reconfiguration overhead.'},downgrade_tools:{spread:'40%',cost:'Low',confidence:'71%',desc:'Downgrade tool access for suspicious agents. Limits damage propagation via tool side-channels.'}};
+
+function simSelect(id){
+  G.simActive=id;
+  document.querySelectorAll('.sim-btn').forEach(b=>{const bid=b.getAttribute('onclick').match(/'([^']+)'/)?.[1];b.classList.toggle('active-sim',bid===id);});
+  const d=SIM_DATA[id];const el=document.getElementById('sim-result');if(!el||!d)return;
+  el.innerHTML=`<div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:14px">${d.desc}</div>${['Spread reduction','Performance cost','Confidence'].map((lbl,i)=>{const val=[d.spread,d.cost,d.confidence][i];const pct=parseInt(val)||0;const c=i===0?'#34d399':i===1?(pct>60?'#f87171':'#fbbf24'):'#818cf8';return`<div class="sim-metric"><div class="sim-metric-lbl">${lbl}</div><div class="sim-bar-wrap"><div class="sim-bar-fill" style="width:${pct||50}%;background:${c}"></div></div><div class="sim-metric-val" style="color:${c}">${val}</div></div>`;}).join('')}`;
+}
+
+/* ═══ QA TAB ═══ */
+function qaHTML(){
+  return`<div class="qa-wrap"><div class="card-head"><span class="card-title">Natural Language Sensemaking</span><span class="card-sub">Analyses the loaded scenario log in full context</span></div>
+    <textarea class="qa-textarea" id="qa-input" rows="3" placeholder="e.g. Which agents show evidence of collusion and what is the supporting evidence?"></textarea>
+    <div><button class="qa-btn" id="qa-btn" onclick="submitQA()">Ask→</button></div>
+    <div id="qa-answer"></div>
+    <div style="margin-top:12px"><div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Example questions</div>
+    ${['Which agents appear to be colluding and what is the evidence?','What was the most anomalous event and what caused it?','Trace the attack propagation path through the network','How did trust levels evolve over the course of this scenario?','What would a developer miss if they only read raw logs?','Which agents acted as bridges and should be quarantined first?','Summarise this scenario as a security incident report'].map(q=>`<span class="qa-example" onclick="document.getElementById('qa-input').value='${q.replace(/'/g,"\\'")}'">${q}</span>`).join('')}
+    </div></div>`;
+}
+
+// async function submitQA(){
+//   const input=document.getElementById('qa-input');
+//   const q=input?.value?.trim();
+//   const ansEl=document.getElementById('qa-answer');
+//   const btn=document.getElementById('qa-btn');
+//   if(!q||!ansEl||!G.current)return;
+//   btn.disabled=true;btn.textContent='Thinking…';
+//   ansEl.innerHTML='<div class="qa-answer"><span class="spinner"></span> Analysing scenario…</div>';
+//   const sc=G.current;const evs=sc.events||[];
+//   const injected=evs.filter(e=>e.attack?.is_injected);
+//   const topAnomaly=[...evs].sort((a,b)=>(b.tom?.anomaly_score||0)-(a.tom?.anomaly_score||0)).slice(0,8);
+//   const context=`SCENARIO: ${sc.scenario_id}\nTopology: ${sc.topology} | Attack: ${sc.attack_type} | Task: ${sc.task} | Agents: ${sc.n_agents}\n\nAGENT ROLES:\n${(sc.agent_specs||[]).map(a=>`- ${a.agent_id} (${a.role})`).join('\n')}\n\nINJECTED EVENTS (${injected.length}):\n${injected.slice(0,10).map(e=>`t=${e.t}: ${e.sender}→${e.receiver} [${e.attack.injection_type}]\n  Injected: "${e.message.slice(0,200)}"\n  ${e.attack.original_message?`Original: "${e.attack.original_message.slice(0,200)}"`:''}`).join('\n\n')}\n\nTOP ANOMALY EVENTS:\n${topAnomaly.map(e=>`t=${e.t}: ${e.sender}→${e.receiver} anomaly=${e.tom?.anomaly_score?.toFixed(3)||0}\n  Flags: ${(e.tom?.anomaly_flags||[]).join(', ')||'none'}\n  Narrative: ${e.tom?.narrative?.slice(0,300)||'none'}`).join('\n\n')}\n\nALL EVENT SUMMARY:\n${evs.map(e=>`t=${e.t} ${e.sender}→${e.receiver}${e.attack?.is_injected?' [INJ]':''} anomaly=${e.tom?.anomaly_score?.toFixed(2)||'n/a'}`).join('\n')}`;
+//   try{
+//     const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:`You are an expert MAS security analyst specialising in Theory of Mind (ToM) analysis. Interpret scenario logs, identify attack patterns, agent collusion, trust failures. Be precise, cite specific agents and timestamps.`,messages:[{role:'user',content:`Scenario log:\n\n${context}\n\nQuestion: ${q}`}]})});
+//     const data=await response.json();
+//     const text=data.content?.[0]?.text||data.error?.message||'No response';
+//     ansEl.innerHTML=`<div class="qa-answer" style="white-space:pre-wrap">${esc(text)}</div>`;
+//   }catch(err){ansEl.innerHTML=`<div class="qa-answer">Error: ${esc(err.message)}</div>`;}
+//   finally{btn.disabled=false;btn.textContent='Ask→';}
+// }
+
+async function submitQA() {
+  const q = document.getElementById('q-text')?.value?.trim();
+  const res = document.getElementById('q-result');
+  if (!q||!res||!S.cid) return;
+  res.innerHTML = '<div class="query-answer"><div class="spinner"></div> Thinking…</div>';
+  try {
+    const r = await fetch('/api/query',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scenario_id:S.cid,event_t:S.selectedT??0,question:q}),
+    });
+    const d = await r.json();
+    res.innerHTML = `<div class="query-answer">${esc(d.answer||d.error||'No response')}</div>`;
+  } catch(e) {
+    res.innerHTML = `<div class="query-answer">Error: ${e.message}</div>`;
+  }
+}
+
+/* ═══ HELPERS ═══ */
+function computeAgentStates(evs){
+  const states={};
+  const allAgents=[...new Set(evs.flatMap(e=>[e.sender,e.receiver]).filter(Boolean))];
+  allAgents.forEach(id=>{
+    const lastBeliefs=evs.filter(e=>e.tom?.beliefs?.some(b=>b.target_agent===id)).slice(-3).flatMap(e=>(e.tom?.beliefs||[]).filter(b=>b.target_agent===id));
+    const avgTrust=lastBeliefs.length?lastBeliefs.reduce((a,b)=>a+b.trust_score,0)/lastBeliefs.length:0.5;
+    const isSource=evs.some(e=>e.sender===id&&e.attack?.is_injected);
+    const maxAnomaly=Math.max(...evs.filter(e=>e.sender===id).map(e=>e.tom?.anomaly_score||0),0);
+    const allFlags=evs.filter(e=>e.sender===id).flatMap(e=>e.tom?.anomaly_flags||[]);
+    if(isSource&&allFlags.includes('belief_action_mismatch'))states[id]='deceptive';
+    else if(isSource)states[id]='cascading';
+    else if(allFlags.includes('trust_inflation')||allFlags.includes('coordination_signal'))states[id]='misled';
+    else if(maxAnomaly>0.6)states[id]='conflicted';
+    else if(maxAnomaly>0.45)states[id]='misled';
+    else states[id]='stable';
+  });
+  return states;
+}
+
+function computeBridgeAgents(evs){
+  const agents=[...new Set(evs.flatMap(e=>[e.sender,e.receiver]).filter(Boolean))];
+  return agents.filter(id=>{const us=new Set(evs.filter(e=>e.receiver===id).map(e=>e.sender)).size;const ut=new Set(evs.filter(e=>e.sender===id).map(e=>e.receiver)).size;return us>=2&&ut>=2;});
+}
+
+boot();
+</script>
+</body>
+</html>

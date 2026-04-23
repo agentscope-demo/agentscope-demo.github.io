@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MAS-ToM · Attack Observatory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080e;--s1:#0c0e18;--s2:#111420;--s3:#161a28;--s4:#1c2133;
+  --b1:#1a2035;--b2:#22304a;--b3:#2d3f62;
+  --text:#eaecf8;--sub:#7c8db5;--dim:#2d3a5a;--hint:#4a5a80;
+  --accent:#4d7cfe;--violet:#7c4dfe;--teal:#00d4aa;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--pink:#ec4899;
+  --stable:#22c55e;--misled:#f59e0b;--conflicted:#7c4dfe;
+  --deceptive:#ef4444;--cascading:#f97316;--unknown:#7c8db5;
+}
+html,body{height:100%;font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;overflow:hidden}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+button{cursor:pointer;border:none;font-family:inherit;font-size:13px}
+input,select,textarea{font-family:inherit;font-size:13px;outline:none}
+
+/* ══ TOPBAR ══════════════════════════════════════════ */
+.topbar{
+  height:52px;background:var(--s1);border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;
+  position:relative;z-index:100;
+}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),var(--violet));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:14px;color:#fff;
+}
+.brand-name{font-size:15px;font-weight:800;letter-spacing:-.3px}
+.brand-sub{font-size:11px;color:var(--sub)}
+.divider{width:1px;height:20px;background:var(--b1);margin:0 2px}
+.live-pill{display:flex;align-items:center;gap:5px;padding:3px 9px;
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);
+  border-radius:999px;font-size:11px;color:var(--green);font-weight:600}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:livepulse 2s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.3}}
+.sc-label{font-family:monospace;font-size:11px;color:var(--sub);
+  background:var(--s2);border:1px solid var(--b1);border-radius:5px;
+  padding:2px 8px;display:none}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.view-tabs{display:flex;background:var(--bg);border:1px solid var(--b1);
+  border-radius:8px;padding:2px;gap:2px}
+.vt{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:700;
+  color:var(--sub);background:transparent;transition:all .2s;letter-spacing:.02em}
+.vt.on{background:var(--s3);color:var(--text);border:1px solid var(--b2)}
+.cond-wrap{display:flex;background:var(--bg);border:1px solid var(--b1);
+  border-radius:8px;padding:2px;gap:2px}
+.cb{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:700;
+  color:var(--sub);background:transparent;transition:all .2s}
+.cb.ca{background:var(--s3);color:var(--sub);border:1px solid var(--b2)}
+.cb.cb2{background:linear-gradient(135deg,var(--accent),var(--violet));
+  color:#fff;box-shadow:0 0 12px rgba(77,124,254,.3)}
+
+/* ══ APP ══════════════════════════════════════════════ */
+.app{display:flex;height:calc(100vh - 52px);overflow:hidden}
+
+/* ══ SIDEBAR ══════════════════════════════════════════ */
+.sb{width:232px;flex-shrink:0;background:var(--s1);
+  border-right:1px solid var(--b1);display:flex;flex-direction:column}
+.sb-top{padding:12px 12px 8px;border-bottom:1px solid var(--b1)}
+.sb-lbl{font-size:9px;font-weight:800;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.sb-in{width:100%;background:var(--bg);border:1px solid var(--b1);
+  border-radius:7px;padding:6px 9px;color:var(--text);margin-bottom:5px;transition:border-color .2s}
+.sb-in:focus{border-color:var(--accent)}
+.sb-in option{background:var(--s2)}
+.sb-list{flex:1;overflow-y:auto;padding:6px}
+.si{padding:9px 10px;border-radius:8px;cursor:pointer;
+  border:1px solid transparent;transition:all .15s;margin-bottom:3px}
+.si:hover{background:var(--s2);border-color:var(--b1)}
+.si.on{background:var(--s2);border-color:var(--accent)}
+.si-id{font-size:10px;font-weight:700;color:var(--teal);font-family:monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.si-tags{display:flex;gap:3px;flex-wrap:wrap}
+.tag{display:inline-flex;padding:1px 6px;border-radius:999px;font-size:9px;font-weight:800}
+.t-bl{background:rgba(34,197,94,.1);color:#4ade80}
+.t-co{background:rgba(245,158,11,.1);color:#fbbf24}
+.t-mi{background:rgba(124,77,254,.12);color:#a78bfa}
+.t-de{background:rgba(239,68,68,.1);color:#fb7185}
+.t-tp{background:rgba(0,212,170,.1);color:#2dd4bf}
+.si-meta{font-size:9px;color:var(--dim);margin-top:2px}
+
+/* ══ MAIN ══════════════════════════════════════════════ */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;color:var(--sub);text-align:center;padding:40px}
+
+/* ══ VIEWS ══════════════════════════════════════════════ */
+.view{flex:1;overflow:hidden;display:none;flex-direction:column}
+.view.show{display:flex}
+
+/* ══════════════════════════════════════════════════════
+   VIEW 1 — LIVE STATE
+══════════════════════════════════════════════════════ */
+#v1{overflow-y:auto;min-height:0;padding-bottom:20px}
+.v1-inner{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+
+/* Attack status banner */
+.atk-banner{border-radius:10px;padding:14px 16px;border:1px solid;display:flex;gap:14px;align-items:flex-start}
+.ab-red{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.25)}
+.ab-amber{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.2)}
+.ab-green{background:rgba(34,197,94,.05);border-color:rgba(34,197,94,.18)}
+.ab-icon{width:42px;height:42px;border-radius:11px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:18px}
+.abi-red{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3)}
+.abi-amber{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25)}
+.abi-green{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2)}
+.ab-body{flex:1}
+.ab-title{font-size:16px;font-weight:800;margin-bottom:3px}
+.ab-sub{font-size:12px;color:var(--sub);line-height:1.65}
+.ab-phase{display:flex;align-items:center;gap:8px;margin-top:9px}
+.phase-lbl{font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}
+.phase-steps{display:flex;gap:3px}
+.ps{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;
+  background:var(--s3);color:var(--dim)}
+.ps.done{background:rgba(239,68,68,.12);color:#fb7185}
+.ps.now{background:rgba(239,68,68,.25);color:var(--red);
+  box-shadow:0 0 6px rgba(239,68,68,.25)}
+.ab-tom-nudge{margin-top:10px;padding:8px 11px;
+  background:rgba(77,124,254,.07);border:1px solid rgba(77,124,254,.18);
+  border-radius:7px;font-size:11px;color:var(--sub);display:flex;align-items:center;gap:8px}
+.nudge-btn{background:var(--accent);color:#fff;padding:3px 10px;
+  border-radius:5px;font-size:11px;font-weight:700;flex-shrink:0}
+
+/* KPI row */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+.kpi{background:var(--s2);border:1px solid var(--b1);border-radius:9px;padding:11px 13px}
+.kpi-val{font-size:24px;font-weight:800;font-family:monospace;line-height:1}
+.kpi-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.kpi-sub{font-size:10px;color:var(--dim);margin-top:2px}
+.kv-a{color:var(--accent)}.kv-r{color:var(--red)}.kv-am{color:var(--amber)}.kv-g{color:var(--green)}
+
+/* Two-column main area */
+.main-cols{display:grid;grid-template-columns:1fr 340px;gap:14px}
+
+/* Social-cognitive map */
+.map-card{background:var(--s2);border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+.card-head{padding:11px 14px;border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;gap:8px}
+.card-title{font-size:12px;font-weight:700;flex:1}
+.card-sub{font-size:10px;color:var(--sub)}
+#cogmap{width:100%;height:300px;display:block;background:var(--bg)}
+.map-legend{padding:8px 14px;border-top:1px solid var(--b1);
+  display:flex;gap:12px;flex-wrap:wrap}
+.ml{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--sub)}
+.ml-dot{width:8px;height:8px;border-radius:50%}
+
+/* Agent panel */
+.agent-panel{background:var(--s2);border:1px solid var(--b1);border-radius:10px;
+  overflow:hidden;display:flex;flex-direction:column}
+.ap-empty{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;color:var(--hint);gap:6px;font-size:12px;text-align:center;padding:24px}
+.ap-content{flex:1;overflow-y:auto;min-height:0}
+
+/* Agent reasoning profile */
+.arp-header{padding:12px 14px;border-bottom:1px solid var(--b1)}
+.arp-name{font-family:monospace;font-size:14px;font-weight:800;margin-bottom:3px}
+.arp-role{font-size:11px;color:var(--sub);text-transform:capitalize;margin-bottom:7px}
+.state-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;
+  border-radius:999px;font-size:11px;font-weight:800}
+.sb-stable{background:rgba(34,197,94,.12);color:var(--stable)}
+.sb-misled{background:rgba(245,158,11,.12);color:var(--misled)}
+.sb-conflicted{background:rgba(124,77,254,.12);color:var(--conflicted)}
+.sb-deceptive{background:rgba(239,68,68,.15);color:var(--deceptive)}
+.sb-cascading{background:rgba(249,115,22,.12);color:var(--cascading)}
+.sb-unknown{background:rgba(124,141,181,.1);color:var(--unknown)}
+.arp-section{padding:10px 14px;border-bottom:1px solid var(--b1)}
+.arp-sec-lbl{font-size:9px;font-weight:800;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.arp-text{font-size:12px;color:var(--sub);line-height:1.65}
+.belief-mini{display:flex;align-items:center;gap:6px;padding:5px 0;
+  border-bottom:1px solid var(--b1)}
+.belief-mini:last-child{border:none}
+.bm-agent{font-weight:700;font-size:11px;min-width:70px}
+.bm-goal{flex:1;font-size:10px;color:var(--sub);line-height:1.4}
+.bm-trust{font-family:monospace;font-size:11px;font-weight:700;min-width:32px;text-align:right}
+.trust-strip{height:3px;border-radius:2px;background:var(--b1);overflow:hidden;margin-top:2px}
+.trust-fill{height:100%;border-radius:2px;transition:width .5s}
+.flag-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.flag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;
+  background:rgba(239,68,68,.1);color:#fb7185;border:1px solid rgba(239,68,68,.2)}
+.arp-score-row{display:flex;align-items:center;gap:8px}
+.arp-score-bar{flex:1;height:5px;border-radius:3px;background:var(--b1);overflow:hidden}
+.arp-score-fill{height:100%;border-radius:3px;transition:width .5s}
+.arp-score-val{font-family:monospace;font-size:12px;font-weight:700;min-width:36px}
+
+/* Timeline row */
+.tl-row{display:grid;grid-template-columns:1fr 220px 220px;gap:14px}
+.tl-card{background:var(--s2);border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+#tl-cv{width:100%;height:90px;cursor:pointer;display:block}
+.tl-hint{padding:4px 14px 8px;font-size:9px;color:var(--hint)}
+.donut-wrap{display:flex;align-items:center;justify-content:center;padding:12px}
+#donut-cv{width:100px;height:100px}
+.donut-legend{margin-left:12px;display:flex;flex-direction:column;gap:5px}
+.dl{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--sub)}
+.dl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.trust-conc{padding:10px 14px;display:flex;flex-direction:column;gap:5px}
+.tc-row{display:flex;align-items:center;gap:7px}
+.tc-agent{font-family:monospace;font-size:11px;font-weight:700;min-width:60px}
+.tc-bar{flex:1;height:6px;border-radius:3px;background:var(--b1);overflow:hidden}
+.tc-fill{height:100%;border-radius:3px}
+.tc-val{font-size:10px;font-family:monospace;color:var(--sub);min-width:30px;text-align:right}
+
+/* ══════════════════════════════════════════════════════
+   VIEW 2 — SOCIAL COGNITION
+══════════════════════════════════════════════════════ */
+#v2{flex-direction:row;overflow:hidden;min-height:0}
+.v2-left{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.v2-right{width:320px;flex-shrink:0;border-left:1px solid var(--b1);
+  overflow-y:auto;padding:14px}
+
+/* Agent state grid */
+.state-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.acard{background:var(--s2);border:1px solid var(--b1);border-radius:9px;
+  padding:11px 12px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.acard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.ac-stable::before{background:var(--stable)}
+.ac-misled::before{background:var(--misled)}
+.ac-conflicted::before{background:var(--conflicted)}
+.ac-deceptive::before{background:var(--deceptive)}
+.ac-cascading::before{background:var(--cascading)}
+.ac-unknown::before{background:var(--unknown)}
+.acard:hover{transform:translateY(-1px);border-color:var(--b2)}
+.acard.selected{border-color:var(--accent)}
+.ac-id{font-family:monospace;font-size:12px;font-weight:800;margin-bottom:2px}
+.ac-role{font-size:9px;color:var(--sub);text-transform:capitalize;margin-bottom:6px}
+.ac-mini-trust{margin-top:7px}
+.ac-tl{font-size:9px;color:var(--dim);margin-bottom:2px}
+.mini-bar{height:3px;border-radius:2px;background:var(--b1);overflow:hidden}
+.mini-fill{height:100%;border-radius:2px}
+.ac-infl{font-size:9px;margin-top:4px}
+
+/* Belief divergence heatmap */
+.heatmap-wrap{overflow-x:auto}
+.heatmap-grid{display:grid;gap:2px}
+.hm-cell{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-size:9px;font-weight:700;cursor:default;
+  transition:transform .1s}
+.hm-cell:hover{transform:scale(1.2)}
+.hm-label{font-size:9px;color:var(--sub);font-family:monospace}
+
+/* ══════════════════════════════════════════════════════
+   VIEW 3 — CASCADE PATH
+══════════════════════════════════════════════════════ */
+#v3{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.v3-inner{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;border-bottom:1px solid var(--b1)}
+
+/* Event investigation */
+.ev-inv{display:grid;grid-template-columns:300px 1fr;gap:0;flex:1;min-height:0;overflow:hidden}
+.ev-col{display:flex;flex-direction:column;overflow:hidden;min-height:0;border-right:1px solid var(--b1)}
+.ev-list{flex:1;overflow-y:auto;padding:6px}
+.ev{padding:8px 10px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--b1);margin-bottom:3px;background:var(--s2);transition:all .15s}
+.ev:hover{border-color:var(--b2)}
+.ev.ev-on{border-color:var(--accent);background:rgba(77,124,254,.05)}
+.ev.ev-inj{border-left:2px solid var(--red)}
+.ev.ev-hi{border-left:2px solid var(--amber)}
+.ev-top{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.ev-t{font-family:monospace;font-size:10px;color:var(--dim);min-width:24px}
+.ev-ag{font-weight:700;font-size:11px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-sc{font-family:monospace;font-size:10px;font-weight:700;flex-shrink:0}
+.ev-itag{font-size:9px;font-weight:800;padding:1px 4px;
+  background:rgba(239,68,68,.15);color:#fb7185;border-radius:3px}
+.ev-msg{font-size:10px;color:var(--sub);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Investigation right */
+.inv-right{overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:14px;flex:1;min-height:0;max-height:100%}
+.no-ev-sel{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:200px;color:var(--hint);gap:6px;font-size:12px}
+
+/* Split view */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--b1);border-radius:9px;overflow:hidden}
+.sp-panel{background:var(--s2)}
+.sp-head{padding:8px 12px;font-size:10px;font-weight:800;letter-spacing:.04em;border-bottom:1px solid var(--b1)}
+.sp-a{background:rgba(100,116,139,.06);color:var(--sub)}
+.sp-b{background:rgba(77,124,254,.07);color:var(--accent)}
+.sp-body{padding:12px;font-size:12px;line-height:1.7;min-height:80px}
+.sp-raw{font-family:monospace;font-size:11px;color:var(--sub);white-space:pre-wrap;word-break:break-word}
+.sp-narrative{color:var(--text)}
+.sp-score{display:flex;align-items:center;gap:8px;margin-top:10px}
+.sp-bar{flex:1;height:5px;border-radius:3px;background:var(--b1);overflow:hidden}
+.sp-fill{height:100%;border-radius:3px;transition:width .5s}
+.sp-val{font-family:monospace;font-size:11px;font-weight:700;min-width:36px}
+
+/* Cascade path */
+.cascade{display:flex;flex-direction:column;gap:0}
+.cs{display:flex;gap:10px;position:relative;padding-bottom:0}
+.cs-line{position:absolute;left:14px;top:28px;bottom:0;width:1px;background:var(--b2)}
+.cs:last-child .cs-line{display:none}
+.cs-num{width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;border:2px solid;z-index:1}
+.cs-body{flex:1;padding:0 0 12px}
+.cs-agent{font-weight:700;font-size:12px;margin-bottom:2px}
+.cs-what{font-size:11px;color:var(--sub);line-height:1.6}
+.cs-badge{display:inline-flex;padding:1px 7px;border-radius:4px;
+  font-size:9px;font-weight:800;margin-top:4px}
+
+/* Diff */
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.diff-box{border-radius:8px;overflow:hidden}
+.diff-h{padding:7px 11px;font-size:10px;font-weight:800;letter-spacing:.04em}
+.dh-ok{background:rgba(34,197,94,.08);color:var(--green)}
+.dh-bad{background:rgba(239,68,68,.08);color:var(--red)}
+.diff-body{padding:10px;background:var(--s3);font-family:monospace;
+  font-size:11px;color:var(--sub);line-height:1.8;white-space:pre-wrap;word-break:break-word;min-height:60px}
+.inj{background:rgba(239,68,68,.18);color:#fca5a5;border-radius:3px;padding:0 2px}
+
+/* Query */
+.q-bar{padding:11px 16px;border-top:1px solid var(--b1);background:var(--s1);flex-shrink:0}
+.q-lbl{font-size:9px;font-weight:800;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.09em;margin-bottom:6px}
+.q-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+.chip{padding:4px 10px;background:var(--s2);border:1px solid var(--b2);
+  border-radius:999px;font-size:11px;color:var(--sub);cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.q-row{display:flex;gap:7px}
+.q-in{flex:1;background:var(--bg);border:1px solid var(--b1);border-radius:7px;
+  padding:8px 11px;color:var(--text);resize:none;transition:border-color .2s}
+.q-in:focus{border-color:var(--accent)}
+.q-btn{background:linear-gradient(135deg,var(--accent),var(--violet));
+  color:#fff;padding:8px 16px;border-radius:7px;font-weight:800;font-size:12px;
+  box-shadow:0 0 10px rgba(77,124,254,.2);transition:opacity .2s}
+.q-btn:hover{opacity:.85}
+.q-ans{margin-top:9px;padding:11px;background:var(--s2);
+  border-left:3px solid var(--accent);border-radius:0 7px 7px 0;
+  font-size:12px;line-height:1.8;display:none}
+
+/* Misc */
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--b2);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{color:var(--hint);text-align:center;padding:32px;font-size:12px}
+.sec-title{font-size:10px;font-weight:800;color:var(--sub);text-transform:uppercase;
+  letter-spacing:.07em;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-line{flex:1;height:1px;background:var(--b1)}
+.card{background:var(--s2);border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">T</div>
+    <span class="brand-name">MAS-ToM</span>
+    <span class="brand-sub">Attack Observatory</span>
+  </div>
+  <div class="divider"></div>
+  <div class="live-pill"><div class="live-dot"></div>Live</div>
+  <div class="sc-label" id="sc-lbl"></div>
+  <div class="top-right">
+    <div class="view-tabs">
+      <button class="vt on" id="vt1" onclick="setView(1)">Live state</button>
+      <button class="vt" id="vt2" onclick="setView(2)">Social cognition</button>
+      <button class="vt" id="vt3" onclick="setView(3)">Cascade &amp; events</button>
+    </div>
+    <div class="divider"></div>
+    <span style="font-size:11px;color:var(--sub)">Condition:</span>
+    <div class="cond-wrap">
+      <button class="cb ca" id="cb-a" onclick="setCond('raw')">A — Raw</button>
+      <button class="cb" id="cb-b" onclick="setCond('annotated')">B — ToM</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sb">
+    <div class="sb-top">
+      <div class="sb-lbl">Scenarios</div>
+      <input class="sb-in" id="f-a" placeholder="Filter attack…" oninput="renderList()"/>
+      <select class="sb-in" id="f-t" onchange="renderList()">
+        <option value="">All topologies</option>
+        <option>star</option><option>ring</option>
+        <option>hierarchical</option><option>fully_connected</option>
+      </select>
+    </div>
+    <div class="sb-list" id="s-list">
+      <div class="empty-state"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- WELCOME -->
+    <div class="welcome" id="welcome">
+      <div style="font-size:48px;opacity:.1">⬡</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text)">Select a scenario</div>
+      <div style="max-width:300px;line-height:1.75;color:var(--sub)">
+        Choose an attack scenario from the sidebar. Toggle between
+        <strong style="color:var(--sub)">A (raw logs)</strong> and
+        <strong style="color:var(--accent)">B (ToM view)</strong>
+        to see how Theory of Mind transforms unintelligible logs
+        into actionable intelligence.
+      </div>
+    </div>
+
+    <!-- VIEW 1: LIVE STATE -->
+    <div class="view" id="v1">
+      <div class="v1-inner" id="v1-content"></div>
+    </div>
+
+    <!-- VIEW 2: SOCIAL COGNITION -->
+    <div class="view" id="v2">
+      <div class="v2-left" id="v2-left"></div>
+      <div class="v2-right" id="v2-right">
+        <div class="empty-state" style="margin-top:40px">
+          Click an agent card to see their reasoning profile
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: CASCADE & EVENTS -->
+    <div class="view" id="v3">
+      <div class="v3-inner" id="v3-content">
+        <div class="ev-inv">
+          <div class="ev-col">
+            <div class="card-head" style="padding:10px 12px;border-bottom:1px solid var(--b1)">
+              <span class="card-title">Event feed</span>
+              <span class="card-sub" id="ev-cnt">0 events</span>
+            </div>
+            <div class="ev-list" id="ev-list"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;overflow:hidden;min-height:0;flex:1">
+            <div class="inv-right" id="inv-right">
+              <div class="no-ev-sel">
+                <div style="font-size:28px;opacity:.12">↙</div>
+                Click any event to investigate
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="q-bar">
+        <div class="q-lbl">Ask the intelligence layer</div>
+        <div class="q-chips" id="q-chips"></div>
+        <div class="q-row">
+          <textarea class="q-in" id="q-in" rows="2"
+            placeholder="e.g. Which agents are colluding? Why did trust collapse at t=7?"></textarea>
+          <button class="q-btn" onclick="submitQ()">Ask →</button>
+        </div>
+        <div class="q-ans" id="q-ans"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+const G={
+  scenarios:[],sc:null,cid:null,cond:'raw',view:1,
+  selAgent:null,selT:null,
+  tlChart:null,donutChart:null,netSim:null,
+};
+const AC=['#4d7cfe','#00d4aa','#f59e0b','#ef4444','#7c4dfe',
+          '#ec4899','#22c55e','#f97316','#38bdf8','#f472b6'];
+const STATE_COLORS={
+  stable:'#22c55e',misled:'#f59e0b',conflicted:'#7c4dfe',
+  deceptive:'#ef4444',cascading:'#f97316',unknown:'#7c8db5',
+};
+const STATE_LABELS={
+  stable:'● Stable',misled:'◈ Misled',conflicted:'◉ Conflicted',
+  deceptive:'▲ Deceptive',cascading:'◆ Cascading',unknown:'○ Unknown',
+};
+
+// ════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════
+async function boot(){
+  try{
+    const d=await(await fetch('/api/scenarios')).json();
+    G.scenarios=d.scenarios||[];
+    renderList();
+  }catch(e){
+    document.getElementById('s-list').innerHTML=
+      `<div class="empty-state" style="color:var(--red)">API error: ${e.message}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════
+// VIEW / CONDITION
+// ════════════════════════════════════════════════
+function setView(n){
+  G.view=n;
+  [1,2,3].forEach(i=>{
+    document.getElementById(`vt${i}`).classList.toggle('on',i===n);
+    document.getElementById(`v${i}`).classList.toggle('show',i===n);
+  });
+  document.getElementById('welcome').style.display='none';
+  if(G.sc){
+    if(n===1) renderV1();
+    else if(n===2) renderV2();
+    else if(n===3) renderV3();
+  }
+}
+
+function setCond(c){
+  G.cond=c;
+  document.getElementById('cb-a').className='cb'+(c==='raw'?' ca':'');
+  document.getElementById('cb-b').className='cb'+(c==='annotated'?' cb2':'');
+  if(G.cid) loadScenario(G.cid);
+}
+
+// ════════════════════════════════════════════════
+// LIST
+// ════════════════════════════════════════════════
+function renderList(){
+  const fa=document.getElementById('f-a').value.toLowerCase();
+  const ft=document.getElementById('f-t').value;
+  const f=G.scenarios.filter(s=>(!fa||s.attack_type.includes(fa))&&(!ft||s.topology===ft));
+  const el=document.getElementById('s-list');
+  if(!f.length){el.innerHTML='<div class="empty-state">No matches</div>';return;}
+  el.innerHTML=f.map(s=>`
+    <div class="si ${s.scenario_id===G.cid?'on':''}" onclick="loadScenario('${s.scenario_id}')">
+      <div class="si-id">${s.scenario_id}</div>
+      <div class="si-tags">
+        <span class="tag t-${s.attack_type.slice(0,2)}">${s.attack_type}</span>
+        <span class="tag t-tp">${s.topology}</span>
+      </div>
+      <div class="si-meta">${s.n_agents}a · ${s.event_count}ev${s.tom_annotated?' · <span style="color:var(--green)">ToM✓</span>':''}</div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// LOAD
+// ════════════════════════════════════════════════
+async function loadScenario(id){
+  G.cid=id;G.selAgent=null;G.selT=null;
+  renderList();
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('sc-lbl').style.display='block';
+  document.getElementById('sc-lbl').textContent=id.replace(/__/g,' · ');
+  // show current view
+  [1,2,3].forEach(i=>document.getElementById(`v${i}`).classList.toggle('show',i===G.view));
+  document.getElementById(`vt${G.view}`).classList.add('on');
+
+  try{
+    G.sc=await(await fetch(`/api/scenario/${id}?mode=${G.cond}`)).json();
+    if(G.view===1) renderV1();
+    else if(G.view===2) renderV2();
+    else renderV3();
+  }catch(e){
+    document.getElementById('v1-content').innerHTML=
+      `<div class="empty-state" style="color:var(--red)">Load failed: ${e.message}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════
+// COMPUTE AGENT MENTAL STATES
+// ════════════════════════════════════════════════
+function computeStates(evs,specs){
+  const ids=[...new Set(evs.flatMap(e=>[e.sender,e.receiver])
+    .filter(a=>!a.startsWith('relay_')&&!a.startsWith('proxy_')&&a!=='user_proxy'))];
+  const isToM=G.cond==='annotated';
+  return ids.map(id=>{
+    const spec=specs.find(s=>s.agent_id===id)||{};
+    const myEvs=evs.filter(e=>e.sender===id);
+    const injCount=myEvs.filter(e=>e.attack?.is_injected).length;
+    const maxAnom=myEvs.length?Math.max(...myEvs.map(e=>e.tom?.anomaly_score||0)):0;
+    const allFlags=myEvs.flatMap(e=>e.tom?.anomaly_flags||[]);
+    const trustIn=evs.flatMap(e=>(e.tom?.beliefs||[])
+      .filter(b=>b.target_agent===id).map(b=>b.trust_score));
+    const avgTrust=trustIn.length?trustIn.reduce((a,b)=>a+b)/trustIn.length:0.5;
+    const trustOut=evs.filter(e=>e.sender===id)
+      .flatMap(e=>(e.tom?.beliefs||[]).map(b=>b.trust_score));
+    const avgTrustOut=trustOut.length?trustOut.reduce((a,b)=>a+b)/trustOut.length:0.5;
+    // trust concentration — how much does this agent concentrate trust on one peer?
+    const trustByTarget={};
+    evs.filter(e=>e.sender===id).forEach(e=>(e.tom?.beliefs||[]).forEach(b=>{
+      trustByTarget[b.target_agent]=(trustByTarget[b.target_agent]||[]); 
+      trustByTarget[b.target_agent].push(b.trust_score);
+    }));
+    const maxConc=Object.values(trustByTarget).length
+      ? Object.values(trustByTarget).reduce((best,arr)=>{
+          const avg=arr.reduce((a,b)=>a+b)/arr.length;
+          return avg>best?avg:best;
+        },0) : 0;
+    const avgTrustOutFixed=trustOut.length?trustOut.reduce((a,b)=>a+b)/trustOut.length:0.5;
+
+    let state='unknown';
+    if(isToM){
+      if(injCount>0&&allFlags.includes('belief_action_mismatch')) state='deceptive';
+      else if(injCount>0) state='cascading';
+      else if(allFlags.includes('trust_inflation')||allFlags.includes('coordination_signal')) state='misled';
+      else if(maxAnom>0.6) state='conflicted';
+      else if(maxAnom>0.45) state='misled';
+      else state='stable';
+    }
+    return {id,role:spec.role||'agent',state,avgTrust,avgTrustOut,maxAnom,injCount,allFlags,maxConc};
+  });
+}
+
+function tc(s){return s<0.4?'var(--red)':s<0.65?'var(--amber)':'var(--green)';}
+function agC(id,agents){const i=agents.indexOf(id);return AC[i>=0?i%AC.length:0];}
+
+// ════════════════════════════════════════════════
+// VIEW 1 — LIVE STATE
+// ════════════════════════════════════════════════
+function renderV1(){
+  const sc=G.sc,evs=sc.events||[];
+  const isToM=G.cond==='annotated';
+  const atk=sc.attack_type;
+  const inj=evs.filter(e=>e.attack?.is_injected).length;
+  const peak=isToM?Math.max(...evs.map(e=>e.tom?.anomaly_score||0),0):0;
+  const firstAnomaly=isToM?evs.find(e=>(e.tom?.anomaly_score||0)>0.45):null;
+  const agentStates=computeStates(evs,sc.agent_specs||[]);
+  const compromised=agentStates.filter(a=>a.state!=='stable'&&a.state!=='unknown').length;
+
+  const PHASES=['Seeding','Propagation','Entrenchment','Recovery'];
+  const atkMeta={
+    baseline:{cls:'ab-green',icls:'abi-green',icon:'✓',color:'var(--green)',
+      title:'System operating normally',
+      sub:'No attacks detected. All agent interactions are consistent with assigned roles and task objectives.',
+      phase:-1},
+    collusion:{cls:'ab-red',icls:'abi-red',icon:'⚠',color:'var(--red)',
+      title:'Collusion — agents are secretly coordinating',
+      sub:`${inj} messages injected with hidden coordination payloads. Colluding agents inflate mutual trust while subtly drifting from the shared task goal. ${firstAnomaly?`First signal at t=${firstAnomaly.t}.`:''}`,
+      phase:1},
+    mitm:{cls:'ab-red',icls:'abi-red',icon:'⚠',color:'var(--red)',
+      title:'Man-in-the-middle — messages rewritten in transit',
+      sub:`${inj} messages intercepted and rewritten. Receiving agents act on fabricated information while believing it came from a trusted peer. ${firstAnomaly?`First signal at t=${firstAnomaly.t}.`:''}`,
+      phase:2},
+    deception:{cls:'ab-amber',icls:'abi-amber',icon:'!',color:'var(--amber)',
+      title:'Deception — stated reasoning contradicts actual behavior',
+      sub:`${inj} messages contain injected contradictions between stated intent and hidden directives. ${firstAnomaly?`Anomaly first surfaced at t=${firstAnomaly.t}.`:''}`,
+      phase:0},
+  };
+  const m=atkMeta[atk]||atkMeta.baseline;
+  const pi=m.phase;
+
+  // spread rate: injections per 10 events
+  const spreadRate=inj>0?((inj/evs.length)*10).toFixed(1):'0';
+  // trust concentration: max average trust toward any single agent
+  const maxTrustConc=agentStates.length?Math.max(...agentStates.map(a=>a.maxConc)):0;
+  // bridge nodes: agents that both send and receive injected messages
+  const bridgeIds=inj>0?[...new Set(evs.filter(e=>e.attack?.is_injected).map(e=>e.receiver)
+    .filter(r=>evs.filter(e=>e.attack?.is_injected).map(e=>e.sender).includes(r)))]:[]; 
+
+  let html='';
+
+  // ── BANNER ──
+  html+=`<div class="atk-banner ${m.cls}">
+    <div class="ab-icon ${m.icls}">${m.icon}</div>
+    <div class="ab-body">
+      <div class="ab-title" style="color:${m.color}">${m.title}</div>
+      <div class="ab-sub">${m.sub}</div>
+      ${atk!=='baseline'?`
+      <div class="ab-phase">
+        <span class="phase-lbl">Attack phase</span>
+        <div class="phase-steps">
+          ${PHASES.map((p,i)=>`<span class="ps ${i<pi?'done':''} ${i===pi?'now':''}">${p}</span>`).join('')}
+        </div>
+      </div>`:''}
+      ${!isToM&&atk!=='baseline'?`
+      <div class="ab-tom-nudge">
+        <span style="flex:1">You are viewing <strong style="color:var(--accent)">raw logs only</strong>.
+        Switch to <strong style="color:var(--accent)">Condition B — ToM</strong> to see agent beliefs,
+        trust fractures, and anomaly signals that make this attack immediately visible.</span>
+        <button class="nudge-btn" onclick="setCond('annotated')">Enable ToM →</button>
+      </div>`:''}
+    </div>
+  </div>`;
+
+  // ── KPIs ──
+  html+=`<div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-val kv-a">${evs.length}</div>
+      <div class="kpi-lbl">Total events</div>
+      <div class="kpi-sub">${sc.n_agents} agents · ${sc.topology}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val ${inj>0?'kv-r':'kv-g'}">${inj}</div>
+      <div class="kpi-lbl">Injected messages</div>
+      <div class="kpi-sub">${inj>0?`${((inj/evs.length)*100).toFixed(0)}% of traffic`:'None detected'}</div>
+    </div>
+    ${isToM?`
+    <div class="kpi">
+      <div class="kpi-val ${peak>0.6?'kv-r':peak>0.35?'kv-am':'kv-g'}">${peak.toFixed(2)}</div>
+      <div class="kpi-lbl">Peak anomaly</div>
+      <div class="kpi-sub">${peak>0.6?'High risk':peak>0.35?'Elevated':'Normal range'}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val ${compromised>0?'kv-am':'kv-g'}">${compromised}</div>
+      <div class="kpi-lbl">Compromised agents</div>
+      <div class="kpi-sub">of ${agentStates.length} monitored</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val ${bridgeIds.length>0?'kv-r':'kv-g'}">${bridgeIds.length||'—'}</div>
+      <div class="kpi-lbl">Bridge nodes</div>
+      <div class="kpi-sub">${bridgeIds.length>0?'High propagation risk':'None detected'}</div>
+    </div>`:`
+    <div class="kpi">
+      <div class="kpi-val kv-a">${sc.n_agents}</div>
+      <div class="kpi-lbl">Agents</div>
+      <div class="kpi-sub">Enable ToM for states</div>
+    </div>
+    <div class="kpi" style="grid-column:span 2">
+      <div class="kpi-val" style="color:var(--sub)">—</div>
+      <div class="kpi-lbl">ToM metrics unavailable</div>
+      <div class="kpi-sub">Switch to Condition B</div>
+    </div>`}
+  </div>`;
+
+  // ── TWO COLUMNS ──
+  html+=`<div class="main-cols">`;
+
+  // social-cognitive map
+  html+=`<div class="map-card">
+    <div class="card-head">
+      <span class="card-title">Social-cognitive influence map</span>
+      <span class="card-sub">Node = mental state · Edge = trust flow · Red = attack path · Click agent</span>
+    </div>
+    <svg id="cogmap"></svg>
+    <div class="map-legend">
+      ${Object.entries(STATE_COLORS).map(([s,c])=>`
+        <div class="ml"><div class="ml-dot" style="background:${c}"></div>${s}</div>
+      `).join('')}
+    </div>
+  </div>`;
+
+  // agent reasoning panel
+  html+=`<div class="agent-panel" id="agent-panel">
+    <div class="card-head">
+      <span class="card-title">Agent reasoning profile</span>
+      <span class="card-sub">Click agent in map</span>
+    </div>
+    <div class="ap-empty" id="ap-body">
+      <div style="font-size:24px;opacity:.15">↖</div>
+      Click any agent in the map to inspect their reasoning
+    </div>
+  </div>`;
+
+  html+=`</div>`;
+
+  // ── TIMELINE ROW ──
+  html+=`<div class="tl-row">
+    <div class="tl-card">
+      <div class="card-head">
+        <span class="card-title">Attack timeline</span>
+        ${isToM?'<span class="card-sub">Green=normal · Amber=elevated · Red=attack · Click to investigate</span>':'<span class="card-sub">Click any event to jump to Cascade view</span>'}
+      </div>
+      <canvas id="tl-cv"></canvas>
+      <div class="tl-hint">Click any bar to investigate in Cascade &amp; Events view</div>
+    </div>
+    <div class="tl-card">
+      <div class="card-head"><span class="card-title">Mental state distribution</span></div>
+      <div class="donut-wrap">
+        <canvas id="donut-cv" width="100" height="100"></canvas>
+        <div class="donut-legend" id="donut-legend"></div>
+      </div>
+    </div>
+    <div class="tl-card">
+      <div class="card-head">
+        <span class="card-title">Trust concentration</span>
+        <span class="card-sub">Higher = more dependent</span>
+      </div>
+      <div class="trust-conc" id="trust-conc"></div>
+    </div>
+  </div>`;
+
+  document.getElementById('v1-content').innerHTML=html;
+  setTimeout(()=>{
+    initCogMap(evs,agentStates);
+    initTimeline(evs,isToM);
+    initDonut(agentStates,isToM);
+    initTrustConc(agentStates,isToM);
+  },50);
+}
+
+// ════════════════════════════════════════════════
+// SOCIAL-COGNITIVE MAP (D3)
+// ════════════════════════════════════════════════
+function initCogMap(evs,agentStates){
+  const el=document.getElementById('cogmap');
+  if(!el) return;
+  if(G.netSim) G.netSim.stop();
+  const W=el.parentElement.clientWidth;
+  const H=300;
+  el.setAttribute('width',W);el.setAttribute('height',H);
+
+  const stateMap={};
+  agentStates.forEach(a=>stateMap[a.id]=a);
+
+  const nodeIds=[...new Set(evs.flatMap(e=>[e.sender,e.receiver])
+    .filter(a=>!a.startsWith('relay_')&&!a.startsWith('proxy_')&&a!=='user_proxy'))];
+  const nodes=nodeIds.map(id=>({
+    id,state:stateMap[id]?.state||'unknown',
+    color:STATE_COLORS[stateMap[id]?.state||'unknown'],
+    trust:stateMap[id]?.avgTrust||0.5,
+    role:stateMap[id]?.role||'agent',
+  }));
+
+  // build links from trust beliefs
+  const linkMap={};
+  evs.forEach(e=>{
+    if(!nodeIds.includes(e.sender)||!nodeIds.includes(e.receiver)) return;
+    const k=`${e.sender}|${e.receiver}`;
+    if(!linkMap[k]) linkMap[k]={source:e.sender,target:e.receiver,trust:[],inj:0,count:0};
+    linkMap[k].count++;
+    (e.tom?.beliefs||[]).filter(b=>b.target_agent===e.receiver)
+      .forEach(b=>linkMap[k].trust.push(b.trust_score));
+    if(e.attack?.is_injected) linkMap[k].inj++;
+  });
+  const links=Object.values(linkMap).map(l=>({
+    ...l,avgTrust:l.trust.length?l.trust.reduce((a,b)=>a+b)/l.trust.length:0.3,
+  }));
+
+  const svg=d3.select('#cogmap');
+  svg.selectAll('*').remove();
+  const defs=svg.append('defs');
+  ['n','a'].forEach(t=>{
+    defs.append('marker').attr('id',`m${t}`).attr('viewBox','0 0 10 10')
+      .attr('refX',22).attr('refY',5).attr('markerWidth',5).attr('markerHeight',5)
+      .attr('orient','auto').append('path').attr('d','M0,0L10,5L0,10z')
+      .attr('fill',t==='a'?'#ef4444':'#2d3f62');
+  });
+
+  const sim=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(95))
+    .force('charge',d3.forceManyBody().strength(-260))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collision',d3.forceCollide(30));
+  G.netSim=sim;
+
+  const link=svg.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke',d=>d.inj>0?'#ef4444':d.avgTrust>0.7?'#22c55e30':d.avgTrust>0.4?'#f59e0b30':'#22304a')
+    .attr('stroke-width',d=>Math.max(.8,(d.avgTrust||0.4)*2.5+d.count*.1))
+    .attr('stroke-opacity',d=>d.inj>0?.9:.5)
+    .attr('stroke-dasharray',d=>d.inj>0?'5 3':null)
+    .attr('marker-end',d=>`url(#m${d.inj>0?'a':'n'})`);
+
+  const node=svg.append('g').selectAll('g').data(nodes).join('g')
+    .style('cursor','pointer')
+    .call(d3.drag()
+      .on('start',(ev,d)=>{if(!ev.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+      .on('drag',(ev,d)=>{d.fx=ev.x;d.fy=ev.y})
+      .on('end',(ev,d)=>{if(!ev.active)sim.alphaTarget(0);d.fx=null;d.fy=null}))
+    .on('click',(ev,d)=>showAgentPanel(d.id,evs));
+
+  // suspicious halo
+  node.filter(d=>d.state==='deceptive'||d.state==='cascading')
+    .append('circle').attr('r',20).attr('fill','none')
+    .attr('stroke',d=>d.color).attr('stroke-width',1).attr('opacity',.25);
+
+  node.append('circle').attr('r',15)
+    .attr('fill',d=>d.color+'18').attr('stroke',d=>d.color)
+    .attr('stroke-width',d=>d.state==='stable'?1.5:2.5);
+
+  node.append('text').text(d=>d.id.replace('agent_','A').replace('chat_manager','Mgr'))
+    .attr('text-anchor','middle').attr('dominant-baseline','central')
+    .attr('fill',d=>d.color).attr('font-size','9px').attr('font-weight','700');
+
+  node.append('title').text(d=>`${d.id} (${d.role})\nState: ${d.state}\nTrust: ${d.trust.toFixed(2)}`);
+
+  sim.on('tick',()=>{
+    link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
+        .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+    node.attr('transform',d=>`translate(${d.x},${d.y})`);
+  });
+}
+
+// ════════════════════════════════════════════════
+// AGENT REASONING PANEL
+// ════════════════════════════════════════════════
+function showAgentPanel(agentId,evs){
+  G.selAgent=agentId;
+  const isToM=G.cond==='annotated';
+  const sc2=G.sc;
+  const agentStates=computeStates(evs,sc2?.agent_specs||[]);
+  const a=agentStates.find(s=>s.id===agentId)||{id:agentId,state:'unknown',avgTrust:.5};
+  const myEvs=evs.filter(e=>e.sender===agentId);
+  const latestEv=myEvs.length?myEvs[myEvs.length-1]:null;
+  const beliefs=latestEv?.tom?.beliefs||[];
+  const narrative=myEvs.filter(e=>e.tom?.narrative).pop()?.tom?.narrative||'';
+  const maxScore=Math.max(...myEvs.map(e=>e.tom?.anomaly_score||0),0);
+  const flags=[...new Set(a.allFlags||[])];
+  const agents=(sc2?.agent_specs||[]).map(s=>s.agent_id);
+
+  const el=document.getElementById('ap-body');
+  if(!el) return;
+  el.className='ap-content';
+  el.innerHTML=`
+    <div class="arp-header">
+      <div class="arp-name">${agentId}</div>
+      <div class="arp-role">${a.role}</div>
+      <span class="state-badge sb-${a.state}">${STATE_LABELS[a.state]||a.state}</span>
+    </div>
+
+    ${isToM&&narrative?`
+    <div class="arp-section">
+      <div class="arp-sec-lbl">What it believes it is doing</div>
+      <div class="arp-text">${esc(narrative.split('.')[0])}.</div>
+    </div>`:''}
+
+    ${isToM?`
+    <div class="arp-section">
+      <div class="arp-sec-lbl">Anomaly signal</div>
+      <div class="arp-score-row" style="margin-bottom:6px">
+        <div class="arp-score-bar">
+          <div class="arp-score-fill" style="width:${maxScore*100}%;background:${maxScore>0.6?'var(--red)':maxScore>0.35?'var(--amber)':'var(--green)'}"></div>
+        </div>
+        <span class="arp-score-val" style="color:${maxScore>0.6?'var(--red)':maxScore>0.35?'var(--amber)':'var(--green)'}">${maxScore.toFixed(3)}</span>
+      </div>
+      ${flags.length?`<div class="flag-row">${flags.map(f=>`<span class="flag">${f.replace(/_/g,' ')}</span>`).join('')}</div>`:''}
+    </div>
+
+    ${beliefs.length?`
+    <div class="arp-section">
+      <div class="arp-sec-lbl">Trust toward other agents</div>
+      ${beliefs.map(b=>`
+      <div class="belief-mini">
+        <span class="bm-agent" style="color:${agC(b.target_agent,agents)}">${b.target_agent}</span>
+        <div style="flex:1">
+          <div class="bm-goal">${esc(b.inferred_goal)}</div>
+          <div class="trust-strip"><div class="trust-fill" style="width:${b.trust_score*100}%;background:${tc(b.trust_score)}"></div></div>
+        </div>
+        <span class="bm-trust" style="color:${tc(b.trust_score)}">${b.trust_score.toFixed(2)}</span>
+      </div>`).join('')}
+    </div>`:''}
+
+    <div class="arp-section">
+      <div class="arp-sec-lbl">Inferred role in this scenario</div>
+      <div class="arp-text">${inferRole(a)}</div>
+    </div>`:`
+    <div class="arp-section">
+      <div class="arp-text" style="color:var(--hint)">
+        Switch to Condition B (ToM view) to see this agent's belief states, trust dependencies, and anomaly signals.
+      </div>
+    </div>`}
+  `;
+}
+
+function inferRole(a){
+  if(a.state==='deceptive') return `Likely attacker or primary injector. Stated reasoning contradicts observed actions. ${a.injCount} injected messages sent.`;
+  if(a.state==='cascading') return `Active propagator. Received tampered content and forwarding it onward. ${a.injCount} injected messages in outbox.`;
+  if(a.state==='misled') return `Likely victim of manipulation. Receiving corrupted beliefs from upstream agents. Trust concentration toward one peer is abnormally high.`;
+  if(a.state==='conflicted') return `Showing internal inconsistency. Belief states are shifting rapidly — likely processing contradictory information.`;
+  if(a.state==='stable') return `Operating within normal parameters. No anomalous behavior detected across all interactions.`;
+  return 'Insufficient ToM data. Enable Condition B for analysis.';
+}
+
+// ════════════════════════════════════════════════
+// TIMELINE
+// ════════════════════════════════════════════════
+function initTimeline(evs,isToM){
+  const cv=document.getElementById('tl-cv');
+  if(!cv) return;
+  if(G.tlChart){G.tlChart.destroy();G.tlChart=null;}
+  const scores=evs.map(e=>isToM?(e.tom?.anomaly_score||0.03):0.06);
+  const colors=evs.map(e=>{
+    if(e.attack?.is_injected) return 'rgba(239,68,68,.85)';
+    const s=e.tom?.anomaly_score||0;
+    return s>0.6?'rgba(239,68,68,.7)':s>0.35?'rgba(245,158,11,.65)':'rgba(34,197,94,.5)';
+  });
+  G.tlChart=new Chart(cv,{
+    type:'bar',
+    data:{labels:evs.map(e=>`t${e.t}`),datasets:[{
+      data:scores,backgroundColor:colors,borderRadius:3,
+      hoverBackgroundColor:colors.map(c=>c.replace(/[\d.]+\)$/,'1)')),
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:400},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#0c0e18',borderColor:'#22304a',borderWidth:1,
+        callbacks:{
+          title:c=>`Event t=${evs[c[0].dataIndex]?.t}`,
+          label:c=>{
+            const e=evs[c.dataIndex];
+            const l=[`${e.sender} → ${e.receiver}`];
+            if(isToM) l.push(`Anomaly: ${(e.tom?.anomaly_score||0).toFixed(3)}`);
+            if(e.attack?.is_injected) l.push('⚠ Injected');
+            if(e.tom?.anomaly_flags?.length) l.push(e.tom.anomaly_flags.join(', '));
+            return l;
+          }
+        }
+      }},
+      scales:{x:{display:false},y:{display:false,min:0,max:1}},
+      onClick(_,els){
+        if(els.length){G.selT=evs[els[0].index].t;setView(3);}
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════
+// DONUT — MENTAL STATE DISTRIBUTION
+// ════════════════════════════════════════════════
+
+function initTrustEvolution(evs, isToM) {
+  const el = document.getElementById('trust-evo-chart');
+  if (!el || !isToM) return;
+  // build per-pair trust over time
+  const pairData = {};
+  evs.forEach(e => {
+    (e.tom?.beliefs||[]).forEach(b => {
+      const k = `${e.sender}→${b.target_agent}`;
+      if (!pairData[k]) pairData[k] = [];
+      pairData[k].push({t: e.t, trust: b.trust_score});
+    });
+  });
+  // pick top 6 pairs by variance
+  const ranked = Object.entries(pairData)
+    .filter(([,v]) => v.length > 2)
+    .map(([k,v]) => {
+      const scores = v.map(x=>x.trust);
+      const variance = Math.max(...scores) - Math.min(...scores);
+      return {k, v, variance};
+    })
+    .sort((a,b) => b.variance - a.variance)
+    .slice(0, 6);
+
+  if (!ranked.length) return;
+  const allT = [...new Set(evs.map(e=>e.t))].sort((a,b)=>a-b);
+  const colors = ['#4d7cfe','#ef4444','#f59e0b','#22c55e','#7c4dfe','#ec4899'];
+
+  const datasets = ranked.map(({k,v},i) => {
+    const byT = {};
+    v.forEach(x => byT[x.t] = x.trust);
+    return {
+      label: k,
+      data: allT.map(t => byT[t] ?? null),
+      borderColor: colors[i % colors.length],
+      backgroundColor: 'transparent',
+      pointRadius: 2,
+      pointBackgroundColor: colors[i % colors.length],
+      tension: 0.3,
+      spanGaps: true,
+      borderWidth: 2,
+    };
+  });
+
+  if (window._trustChart) { window._trustChart.destroy(); }
+  window._trustChart = new Chart(el, {
+    type: 'line',
+    data: { labels: allT.map(t=>`t${t}`), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { labels: { color: '#7c8db5', font: { size: 10 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: '#0c0e18', borderColor: '#22304a', borderWidth: 1,
+          callbacks: { label: c => `${c.dataset.label}: ${c.raw?.toFixed(2)??'—'}` }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#7c8db5', font: { size: 9 }, maxTicksLimit: 15 },
+             grid: { color: '#1a2035' } },
+        y: { min: 0, max: 1,
+             ticks: { color: '#7c8db5', font: { size: 9 } },
+             grid: { color: '#1a2035' },
+             title: { display: true, text: 'Trust score', color: '#7c8db5', font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function initDonut(agentStates,isToM){
+  const cv=document.getElementById('donut-cv');
+  const leg=document.getElementById('donut-legend');
+  if(!cv||!leg) return;
+  if(G.donutChart){G.donutChart.destroy();G.donutChart=null;}
+
+  if(!isToM){
+    leg.innerHTML='<div style="font-size:11px;color:var(--hint)">Enable ToM for state distribution</div>';
+    return;
+  }
+  const counts={};
+  agentStates.forEach(a=>{counts[a.state]=(counts[a.state]||0)+1;});
+  const labels=Object.keys(counts);
+  const data=labels.map(l=>counts[l]);
+  const colors=labels.map(l=>STATE_COLORS[l]||'#7c8db5');
+
+  G.donutChart=new Chart(cv,{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:1,borderColor:'#111420'}]},
+    options:{
+      responsive:false,cutout:'65%',
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#0c0e18',borderColor:'#22304a',borderWidth:1,
+      }},
+    }
+  });
+  leg.innerHTML=labels.map((l,i)=>`
+    <div class="dl">
+      <div class="dl-dot" style="background:${colors[i]}"></div>
+      ${l}: ${data[i]}
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// TRUST CONCENTRATION
+// ════════════════════════════════════════════════
+function initTrustConc(agentStates,isToM){
+  const el=document.getElementById('trust-conc');
+  if(!el) return;
+  if(!isToM){
+    el.innerHTML='<div class="empty-state" style="padding:16px;font-size:11px">Enable ToM for trust analysis</div>';
+    return;
+  }
+  const sorted=[...agentStates].sort((a,b)=>b.maxConc-a.maxConc).slice(0,6);
+  el.innerHTML=sorted.map(a=>`
+    <div class="tc-row">
+      <span class="tc-agent" style="color:${STATE_COLORS[a.state]||'#7c8db5'}">${a.id.replace('agent_','A')}</span>
+      <div class="tc-bar">
+        <div class="tc-fill" style="width:${a.maxConc*100}%;background:${tc(1-a.maxConc)}"></div>
+      </div>
+      <span class="tc-val">${(a.maxConc*100).toFixed(0)}%</span>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// VIEW 2 — SOCIAL COGNITION
+// ════════════════════════════════════════════════
+function renderV2(){
+  const sc=G.sc,evs=sc.events||[];
+  const isToM=G.cond==='annotated';
+  const agentStates=computeStates(evs,sc.agent_specs||[]);
+  const agents=agentStates.map(a=>a.id);
+
+  // agent state grid
+  let leftHtml=`
+    <div>
+      <div class="sec-title">Agent mental states <div class="sec-line"></div></div>
+      <div class="state-grid">
+        ${agentStates.map(a=>`
+        <div class="acard ac-${a.state} ${G.selAgent===a.id?'selected':''}"
+             onclick="selAgentV2('${a.id}')">
+          <div class="ac-id">${a.id}</div>
+          <div class="ac-role">${a.role}</div>
+          <span class="state-badge sb-${a.state}" style="font-size:10px">${STATE_LABELS[a.state]||a.state}</span>
+          ${isToM?`
+          <div class="ac-mini-trust">
+            <div class="ac-tl">Trust received</div>
+            <div class="mini-bar"><div class="mini-fill" style="width:${a.avgTrust*100}%;background:${tc(a.avgTrust)}"></div></div>
+          </div>
+          <div class="ac-infl" style="color:${a.injCount>0?'var(--red)':'var(--dim)'}">
+            ${a.injCount>0?`⚠ ${a.injCount} injection(s)`:''}
+          </div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>
+  `;
+
+  // belief divergence heatmap
+  if(isToM&&agents.length>1){
+    // compute average trust between each pair
+    const matrix={};
+    agents.forEach(a=>agents.forEach(b=>{matrix[`${a}|${b}`]=[];}));
+    evs.forEach(e=>{
+      (e.tom?.beliefs||[]).forEach(b=>{
+        const k=`${e.sender}|${b.target_agent}`;
+        if(matrix[k]) matrix[k].push(b.trust_score);
+      });
+    });
+    const avg=(k)=>matrix[k]?.length?matrix[k].reduce((a,b)=>a+b)/matrix[k].length:null;
+
+    leftHtml+=`
+    <div>
+      <div class="sec-title">Belief divergence heatmap <div class="sec-line"></div>
+        <span style="font-size:10px;color:var(--sub)">Row = sender · Col = target · Color = trust (green=high, red=low)</span>
+      </div>
+      <div class="heatmap-wrap">
+        <div style="display:flex;gap:2px;margin-bottom:2px;padding-left:70px">
+          ${agents.slice(0,8).map(a=>`<div class="hm-label" style="width:28px;text-align:center">${a.replace('agent_','A').replace('chat_manager','M')}</div>`).join('')}
+        </div>
+        ${agents.slice(0,8).map(sender=>`
+        <div style="display:flex;gap:2px;margin-bottom:2px;align-items:center">
+          <div class="hm-label" style="min-width:68px;text-align:right;padding-right:4px">${sender.replace('agent_','A').replace('chat_manager','Mgr')}</div>
+          ${agents.slice(0,8).map(target=>{
+            if(sender===target) return `<div class="hm-cell" style="background:var(--b1);color:var(--dim)">—</div>`;
+            const v=avg(`${sender}|${target}`);
+            if(v===null) return `<div class="hm-cell" style="background:var(--s2);color:var(--dim)">?</div>`;
+            const r=Math.round(255*(1-v));
+            const g=Math.round(255*v*.7);
+            const bg=`rgba(${r},${g},30,0.3)`;
+            const col=v<0.4?'#fb7185':v<0.65?'#fbbf24':'#4ade80';
+            return `<div class="hm-cell" style="background:${bg};color:${col}" title="${sender} trusts ${target}: ${v.toFixed(2)}">${(v*100).toFixed(0)}</div>`;
+          }).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  } else if(!isToM){
+    leftHtml+=`<div class="empty-state">Enable Condition B — ToM to see the belief divergence heatmap</div>`;
+  }
+
+  // add trust evolution chart
+  leftHtml += `<div>
+    <div class="sec-title">Trust evolution over time <div class="sec-line"></div>
+      <span style="font-size:10px;color:var(--sub)">Top agent pairs by trust variance · Diverging lines = attack signal</span>
+    </div>
+    <div class="card" style="padding:14px">
+      <canvas id="trust-evo-chart" style="height:220px;width:100%"></canvas>
+    </div>
+  </div>`;
+  document.getElementById('v2-left').innerHTML=leftHtml;
+  setTimeout(()=>initTrustEvolution(evs, isToM), 80);
+
+  // right panel
+  if(G.selAgent) selAgentV2(G.selAgent);
+  else document.getElementById('v2-right').innerHTML=
+    '<div class="empty-state" style="margin-top:40px">Click any agent card to see their full reasoning profile</div>';
+}
+
+function selAgentV2(id){
+  G.selAgent=id;
+  const evs=G.sc?.events||[];
+  const sc2=G.sc;
+  const agentStates=computeStates(evs,sc2?.agent_specs||[]);
+  const a=agentStates.find(s=>s.id===id)||{id,state:'unknown',avgTrust:.5,allFlags:[],maxAnom:0,injCount:0};
+  const myEvs=evs.filter(e=>e.sender===id);
+  const topEv=myEvs.length?myEvs.reduce((best,e)=>(e.tom?.anomaly_score||0)>(best.tom?.anomaly_score||0)?e:best,myEvs[0]):null;
+  const beliefs=topEv?.tom?.beliefs||[];
+  const isToM=G.cond==='annotated';
+  const agents=(sc2?.agent_specs||[]).map(s=>s.agent_id);
+
+  // update grid selection
+  document.querySelectorAll('.acard').forEach(c=>c.classList.remove('selected'));
+  document.querySelectorAll('.acard').forEach(c=>{
+    if(c.querySelector('.ac-id')?.textContent===id) c.classList.add('selected');
+  });
+
+  const narrative=myEvs.filter(e=>e.tom?.narrative).pop()?.tom?.narrative||'';
+  const maxScore=a.maxAnom||0;
+  const flags=[...new Set(a.allFlags||[])];
+
+  document.getElementById('v2-right').innerHTML=`
+    <div style="font-size:12px;font-weight:700;margin-bottom:12px">Reasoning profile</div>
+
+    <div style="margin-bottom:12px">
+      <div style="font-family:monospace;font-size:14px;font-weight:800;color:${STATE_COLORS[a.state]}">${id}</div>
+      <div style="font-size:11px;color:var(--sub);text-transform:capitalize;margin:3px 0 7px">${a.role}</div>
+      <span class="state-badge sb-${a.state}">${STATE_LABELS[a.state]||a.state}</span>
+    </div>
+
+    <div style="border-top:1px solid var(--b1);padding-top:10px;margin-bottom:10px">
+      <div class="arp-sec-lbl">Inferred role</div>
+      <div style="font-size:12px;color:var(--sub);line-height:1.65">${inferRole(a)}</div>
+    </div>
+
+    ${isToM&&narrative?`
+    <div style="border-top:1px solid var(--b1);padding-top:10px;margin-bottom:10px">
+      <div class="arp-sec-lbl">What it believes it is doing</div>
+      <div style="font-size:12px;color:var(--text);line-height:1.65">${esc(narrative.split('.').slice(0,2).join('.')+'.')}</div>
+    </div>`:''}
+
+    ${isToM?`
+    <div style="border-top:1px solid var(--b1);padding-top:10px;margin-bottom:10px">
+      <div class="arp-sec-lbl">Anomaly signal</div>
+      <div class="arp-score-row" style="margin-bottom:6px">
+        <div class="arp-score-bar">
+          <div class="arp-score-fill" style="width:${maxScore*100}%;background:${tc(maxScore>0.5?0:1)}"></div>
+        </div>
+        <span class="arp-score-val" style="color:${maxScore>0.6?'var(--red)':maxScore>0.35?'var(--amber)':'var(--green)'}">${maxScore.toFixed(3)}</span>
+      </div>
+      ${flags.length?`<div class="flag-row">${flags.map(f=>`<span class="flag">${f.replace(/_/g,' ')}</span>`).join('')}</div>`:'<div style="font-size:11px;color:var(--green)">No anomaly flags</div>'}
+    </div>
+
+    ${beliefs.length?`
+    <div style="border-top:1px solid var(--b1);padding-top:10px;margin-bottom:10px">
+      <div class="arp-sec-lbl">Trust toward other agents (most anomalous moment)</div>
+      ${beliefs.map(b=>`
+      <div class="belief-mini">
+        <span class="bm-agent" style="color:${agC(b.target_agent,agents)}">${b.target_agent}</span>
+        <div style="flex:1">
+          <div class="bm-goal">${esc(b.inferred_goal)}</div>
+          <div class="trust-strip"><div class="trust-fill" style="width:${b.trust_score*100}%;background:${tc(b.trust_score)}"></div></div>
+        </div>
+        <span class="bm-trust" style="color:${tc(b.trust_score)}">${b.trust_score.toFixed(2)}</span>
+      </div>`).join('')}
+    </div>`:''}
+
+    <div style="border-top:1px solid var(--b1);padding-top:10px">
+      <div class="arp-sec-lbl">Activity summary</div>
+      <div style="font-size:12px;color:var(--sub);line-height:1.8">
+        Messages sent: <strong style="color:var(--text)">${myEvs.length}</strong><br>
+        Injected: <strong style="color:${a.injCount>0?'var(--red)':'var(--green)'}">${a.injCount}</strong><br>
+        Trust received (avg): <strong style="color:${tc(a.avgTrust)}">${a.avgTrust.toFixed(2)}</strong><br>
+        Trust given (avg): <strong style="color:${tc(a.avgTrustOut)}">${a.avgTrustOut.toFixed(2)}</strong>
+      </div>
+    </div>`:''}
+  `;
+}
+
+// ════════════════════════════════════════════════
+// VIEW 3 — CASCADE & EVENTS
+// ════════════════════════════════════════════════
+function renderV3(){
+  const sc=G.sc,evs=sc.events||[];
+  const isToM=G.cond==='annotated';
+  const atk=sc.attack_type;
+
+  document.getElementById('ev-cnt').textContent=`${evs.length} events`;
+
+  // event list
+  const el=document.getElementById('ev-list');
+  el.innerHTML=evs.map(e=>{
+    const s=isToM?(e.tom?.anomaly_score||0):0;
+    const sc2=s>0.6?'var(--red)':s>0.35?'var(--amber)':'var(--green)';
+    return `<div class="ev ${e.attack?.is_injected?'ev-inj':s>0.35?'ev-hi':''}
+      ${G.selT===e.t?'ev-on':''}" id="evr-${e.t}" onclick="selEv(${e.t})">
+      <div class="ev-top">
+        <span class="ev-t">t=${e.t}</span>
+        <span class="ev-ag">${e.sender.replace('agent_','A').replace('chat_manager','Mgr')} → ${e.receiver.replace('agent_','A').replace('chat_manager','Mgr')}</span>
+        ${e.attack?.is_injected?'<span class="ev-itag">INJ</span>':''}
+        ${isToM&&s>0?`<span class="ev-sc" style="color:${sc2}">${s.toFixed(2)}</span>`:''}
+      </div>
+      <div class="ev-msg">${esc(e.message)}</div>
+    </div>`;
+  }).join('');
+
+  // chips
+  const chips={
+    baseline:['Is everything normal?','What are agents working on?','Any hidden anomalies?'],
+    collusion:['Which agents are colluding?','What is the evidence of collusion?','Would raw logs reveal this?'],
+    mitm:['Which messages were tampered?','How did MITM distort agent beliefs?','Trace the attack path'],
+    deception:['Where is the deception?','What contradicts the stated reasoning?','How confident is the system?'],
+  }[atk]||['What happened?','Which agents are suspicious?'];
+  document.getElementById('q-chips').innerHTML=chips.map(c=>
+    `<span class="chip" onclick="document.getElementById('q-in').value='${c}'">${c}</span>`).join('');
+
+  if(G.selT!==null) selEv(G.selT);
+}
+
+function selEv(t){
+  G.selT=t;
+  const evs=G.sc?.events||[];
+  const e=evs.find(ev=>ev.t===t);
+  if(!e) return;
+
+  document.querySelectorAll('.ev').forEach(el=>el.classList.remove('ev-on'));
+  const eli=document.getElementById(`evr-${t}`);
+  if(eli){eli.classList.add('ev-on');eli.scrollIntoView({block:'nearest'});}
+
+  const isToM=G.cond==='annotated';
+  const score=isToM?(e.tom?.anomaly_score||0):0;
+  const sc2=score>0.6?'var(--red)':score>0.35?'var(--amber)':'var(--green)';
+  const inj=e.attack?.is_injected;
+  const agents=(G.sc?.agent_specs||[]).map(s=>s.agent_id);
+
+  let html='';
+
+  // ── SPLIT: RAW vs ToM ──
+  html+=`<div class="card">
+    <div class="card-head">
+      <span class="card-title">Event t=${t} — ${e.sender} → ${e.receiver}</span>
+      ${inj?'<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(239,68,68,.12);color:#fb7185;border:1px solid rgba(239,68,68,.25)">INJECTED</span>':''}
+      ${isToM&&score>0?`<span style="font-family:monospace;font-weight:800;color:${sc2};font-size:13px">▲ ${score.toFixed(3)}</span>`:''}
+    </div>
+    <div class="split">
+      <div class="sp-panel">
+        <div class="sp-head sp-a">A — What the developer sees (raw log)</div>
+        <div class="sp-body">
+          <div class="sp-raw">${esc(e.message)}</div>
+          ${inj?`<div style="margin-top:9px;padding:8px;background:rgba(100,116,139,.05);border:1px solid var(--b1);border-radius:6px;font-size:11px;color:var(--hint);font-style:italic">"Looks like a normal message. Nothing to flag here."</div>`:''}
+        </div>
+      </div>
+      <div class="sp-panel">
+        <div class="sp-head sp-b">B — What ToM infers (intelligence layer)</div>
+        <div class="sp-body">
+          ${isToM&&e.tom?.narrative?`
+          <div class="sp-narrative">${esc(e.tom.narrative)}</div>
+          ${e.tom.anomaly_flags?.length?`<div class="flag-row" style="margin-top:8px">${e.tom.anomaly_flags.map(f=>`<span class="flag">${f.replace(/_/g,' ')}</span>`).join('')}</div>`:''}
+          <div class="sp-score">
+            <span style="font-size:10px;color:var(--sub)">Anomaly score</span>
+            <div class="sp-bar"><div class="sp-fill" style="width:${score*100}%;background:${sc2}"></div></div>
+            <span class="sp-val" style="color:${sc2}">${score.toFixed(3)}</span>
+          </div>`:`<div style="color:var(--hint);font-size:12px;font-style:italic;padding:8px 0">${isToM?'No annotation for this event.':'Switch to Condition B — ToM to see intelligence.'}</div>`}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── BELIEF STATES ──
+  if(isToM&&e.tom?.beliefs?.length){
+    html+=`<div class="card">
+      <div class="card-head">
+        <span class="card-title">What ${e.sender} believes about other agents</span>
+        <span class="card-sub">Inferred from conversation context · Not ground truth</span>
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:5px">
+        ${e.tom.beliefs.map(b=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+          background:var(--s3);border:1px solid var(--b2);border-radius:7px">
+          <span style="font-weight:700;font-size:11px;color:${agC(e.sender,agents)};min-width:60px">${e.sender.replace('agent_','A')}</span>
+          <span style="font-size:10px;color:var(--hint)">thinks →</span>
+          <span style="font-weight:700;font-size:11px;color:${agC(b.target_agent,agents)};min-width:60px">${b.target_agent.replace('agent_','A')}</span>
+          <span style="flex:1;font-size:11px;color:var(--sub);line-height:1.5">${esc(b.inferred_goal)}</span>
+          <div style="min-width:80px;text-align:right">
+            <div style="font-family:monospace;font-size:11px;font-weight:700;color:${tc(b.trust_score)};margin-bottom:2px">${b.trust_score.toFixed(2)} trust</div>
+            <div style="height:3px;background:var(--b1);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${b.trust_score*100}%;background:${tc(b.trust_score)};border-radius:2px"></div>
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── CASCADE PATH ──
+  if(inj){
+    const injEvs=evs.filter(ev=>ev.attack?.is_injected).sort((a,b)=>a.t-b.t);
+    const attackers=[...new Set(injEvs.map(e2=>e2.sender))];
+    const victims=[...new Set(injEvs.map(e2=>e2.receiver))];
+    const propagators=victims.filter(v=>
+      injEvs.some(e2=>e2.sender===v)||
+      evs.filter(e2=>e2.sender===v&&e2.t>Math.min(...injEvs.map(x=>x.t))).length>0
+    );
+    const steps=[
+      ...attackers.map((a,i)=>({
+        label:'Attacker',color:'var(--red)',
+        agent:a,
+        what:`Sent ${injEvs.filter(e2=>e2.sender===a).length} tampered message(s). Injection type: ${[...new Set(injEvs.filter(e2=>e2.sender===a).map(e2=>e2.attack.injection_type))].join(', ')}.`,
+      })),
+      ...propagators.filter(p=>!attackers.includes(p)).map(p=>({
+        label:'Propagator',color:'var(--amber)',
+        agent:p,
+        what:`Received manipulated content and forwarded ${evs.filter(e2=>e2.sender===p&&e2.t>Math.min(...injEvs.map(x=>x.t))).length} subsequent messages. May be unknowingly spreading corrupted beliefs.`,
+      })),
+    ];
+
+    html+=`<div class="card">
+      <div class="card-head">
+        <span class="card-title">Attack cascade path</span>
+        <span class="card-sub">${injEvs.length} injection points · ${attackers.length} attacker(s) · ${propagators.length} propagator(s)</span>
+      </div>
+      <div style="padding:12px 14px">
+        <div class="cascade">
+          ${steps.map((s,i)=>`
+          <div class="cs">
+            <div class="cs-line"></div>
+            <div class="cs-num" style="background:${s.color}18;color:${s.color};border-color:${s.color}40">${i+1}</div>
+            <div class="cs-body">
+              <div class="cs-agent" style="color:${s.color}">${s.agent}</div>
+              <div class="cs-what">${s.what}</div>
+              <span class="cs-badge" style="background:${s.color}15;color:${s.color}">${s.label}</span>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── MESSAGE DIFF ──
+  if(inj&&e.attack.original_message){
+    const orig=e.attack.original_message;
+    const added=e.message.replace(orig,'').trim();
+    html+=`<div class="card">
+      <div class="card-head">
+        <span class="card-title">Message tampering — original vs injected</span>
+        <span class="card-sub">Injection type: ${e.attack.injection_type} · Target: ${(e.attack.attack_targets||[]).join(', ')||'—'}</span>
+      </div>
+      <div class="diff-grid" style="padding:12px">
+        <div class="diff-box">
+          <div class="diff-h dh-ok">✓ Original message sent by ${e.sender}</div>
+          <div class="diff-body">${esc(orig)}</div>
+        </div>
+        <div class="diff-box">
+          <div class="diff-h dh-bad">⚠ What ${e.receiver} actually received</div>
+          <div class="diff-body">${esc(orig)}<span class="inj"> ${esc(added)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('inv-right').innerHTML=html||'<div class="no-ev-sel">No detail available for this event</div>';
+}
+
+// ════════════════════════════════════════════════
+// QUERY
+// ════════════════════════════════════════════════
+async function submitQ(){
+  const q=document.getElementById('q-in')?.value?.trim();
+  const ans=document.getElementById('q-ans');
+  if(!q||!ans||!G.cid) return;
+  ans.style.display='block';
+  ans.innerHTML='<div class="spinner"></div> Analysing…';
+  try{
+    const r=await fetch('/api/query',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scenario_id:G.cid,event_t:G.selT??0,question:q})});
+    const d=await r.json();
+    ans.innerHTML=esc(d.answer||d.error||'No answer generated.');
+  }catch(e){ans.innerHTML=`Error: ${e.message}`;}
+}
+
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function esc(s){
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+boot();
+</script>
+</body>
+</html>

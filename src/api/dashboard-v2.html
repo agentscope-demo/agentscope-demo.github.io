@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MAS-ToM — Security Sensemaking Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b14;--surface:#0f1422;--card:#161b2e;--card2:#1c2240;
+  --border:#1e2a4a;--border2:#2a3a6a;
+  --text:#e2e8f0;--muted:#6b7a99;--dim:#3a4a6a;
+  --accent:#6366f1;--accent2:#06b6d4;--accent3:#8b5cf6;
+  --success:#10b981;--warning:#f59e0b;--danger:#ef4444;--pink:#ec4899;
+  --r:10px;--r2:6px;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;line-height:1.6;overflow-x:hidden}
+button{cursor:pointer;border:none;font-family:inherit;font-size:13px}
+input,textarea,select{font-family:inherit;font-size:13px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Topbar ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;
+  display:flex;align-items:center;justify-content:space-between;height:52px;
+  position:sticky;top:0;z-index:200;backdrop-filter:blur(8px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent3));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
+.logo-text{font-size:16px;font-weight:800;letter-spacing:-0.3px}
+.logo-sub{font-size:11px;color:var(--muted);margin-left:4px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--success);
+  box-shadow:0 0 6px var(--success);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* ── Condition toggle ── */
+.cond-wrap{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px}
+.cond-btn{padding:5px 14px;border-radius:6px;font-weight:700;font-size:11px;
+  color:var(--muted);background:transparent;transition:all 0.2s;letter-spacing:0.02em}
+.cond-btn.active-a{background:var(--card2);color:var(--accent2)}
+.cond-btn.active-b{background:var(--accent);color:#fff;box-shadow:0 0 12px rgba(99,102,241,0.4)}
+
+/* ── Layout ── */
+.main{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 52px)}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column}
+.sidebar-head{padding:14px 14px 8px;border-bottom:1px solid var(--border)}
+.sidebar-head h3{font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+.filter-row{display:flex;gap:6px;margin-bottom:6px}
+.filter-input{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:6px 10px;color:var(--text);width:100%;outline:none;transition:border-color 0.2s}
+.filter-input:focus{border-color:var(--accent)}
+.filter-input option{background:var(--surface)}
+.scenario-list{padding:8px}
+.s-item{padding:10px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;
+  transition:all 0.15s;margin-bottom:3px}
+.s-item:hover{background:var(--card);border-color:var(--border)}
+.s-item.active{background:var(--card);border-color:var(--accent);
+  box-shadow:0 0 0 1px rgba(99,102,241,0.2)}
+.s-id{font-size:10px;font-weight:700;color:var(--accent2);font-family:monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-meta{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;padding:1px 7px;
+  border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.b-baseline{background:rgba(16,185,129,0.15);color:#34d399}
+.b-collusion{background:rgba(245,158,11,0.15);color:#fbbf24}
+.b-mitm{background:rgba(99,102,241,0.15);color:#a5b4fc}
+.b-deception{background:rgba(236,72,153,0.15);color:#f9a8d4}
+.b-topo{background:rgba(6,182,212,0.12);color:#67e8f9}
+.b-task{background:rgba(139,92,246,0.12);color:#c4b5fd}
+.b-inject{background:rgba(239,68,68,0.2);color:#fca5a5;border:1px solid rgba(239,68,68,0.35)}
+.b-info{background:rgba(99,102,241,0.12);color:#a5b4fc}
+
+/* ── Content ── */
+.content{overflow-y:auto;background:var(--bg)}
+.no-scenario{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;color:var(--muted);gap:12px}
+.no-scenario-icon{font-size:48px;opacity:0.3}
+
+/* ── Scenario header ── */
+.scenario-header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:14px 20px;position:sticky;top:0;z-index:100}
+.scenario-id{font-family:monospace;font-size:13px;color:var(--accent2);
+  font-weight:700;margin-bottom:6px}
+.meta-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stat-pills{display:flex;gap:8px;margin-top:10px}
+.stat-pill{background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:8px 14px;display:flex;flex-direction:column;align-items:center;min-width:90px}
+.stat-val{font-size:20px;font-weight:800;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
+.v-events{color:var(--accent)}
+.v-anomaly{color:var(--danger)}
+.v-injected{color:var(--warning)}
+.v-agents{color:var(--accent2)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);
+  padding:0 20px;background:var(--surface)}
+.tab{padding:10px 16px;font-weight:700;font-size:12px;color:var(--muted);
+  background:transparent;border-bottom:2px solid transparent;
+  transition:all 0.15s;letter-spacing:0.02em}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panels{padding:0}
+.panel{padding:20px;display:none}
+.panel.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px;margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700}
+.card-sub{font-size:11px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── Network graph ── */
+#network-svg{width:100%;height:420px;border-radius:8px;background:var(--bg)}
+.node circle{stroke-width:2;cursor:pointer;transition:all 0.3s}
+.node text{fill:var(--text);font-size:11px;font-weight:600;pointer-events:none}
+.link{stroke-width:1.5;fill:none;opacity:0.6}
+.link.active-link{stroke-width:3;opacity:1}
+.link.attack-link{stroke:var(--danger);opacity:0.9}
+
+/* ── Playback ── */
+.playback-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;margin-bottom:16px}
+.pb-controls{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pb-btn{width:36px;height:36px;border-radius:50%;background:var(--card2);
+  color:var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:16px;transition:background 0.2s;border:1px solid var(--border)}
+.pb-btn:hover{background:var(--accent);border-color:var(--accent)}
+.pb-btn.playing{background:var(--accent);border-color:var(--accent)}
+.pb-info{flex:1}
+.pb-label{font-size:11px;color:var(--muted);margin-bottom:4px}
+.pb-progress{font-size:16px;font-weight:800;font-family:monospace;color:var(--accent2)}
+.pb-slider{width:100%;accent-color:var(--accent);cursor:pointer}
+.pb-speed{display:flex;gap:4px}
+.speed-btn{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;
+  background:var(--bg);color:var(--muted);border:1px solid var(--border);transition:all 0.15s}
+.speed-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ── Live event display ── */
+.live-event{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:12px;min-height:80px;transition:all 0.3s;margin-bottom:8px}
+.live-event.injected{border-color:var(--danger);background:rgba(239,68,68,0.05)}
+.live-event.anomalous{border-color:var(--warning);background:rgba(245,158,11,0.05)}
+.le-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.le-t{font-family:monospace;font-size:11px;color:var(--muted)}
+.le-agents{font-weight:700;font-size:13px}
+.le-msg{font-size:12px;color:var(--muted);line-height:1.6}
+.le-score{font-family:monospace;font-weight:800;font-size:14px}
+
+/* ── Side-by-side ── */
+.sbs-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sbs-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.sbs-head{padding:10px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;font-weight:700;font-size:12px}
+.sbs-head.raw-head{background:rgba(6,182,212,0.08);color:var(--accent2)}
+.sbs-head.tom-head{background:rgba(99,102,241,0.08);color:var(--accent)}
+.sbs-events{height:520px;overflow-y:auto;padding:10px}
+.sbs-event{padding:10px;border-radius:6px;margin-bottom:6px;border:1px solid var(--border2);
+  background:var(--surface);font-size:12px;cursor:pointer;transition:border-color 0.15s}
+.sbs-event:hover{border-color:var(--accent)}
+.sbs-event.sbs-inject{border-left:3px solid var(--danger)}
+.sbs-event.sbs-selected{border-color:var(--accent);background:rgba(99,102,241,0.06)}
+.sbs-agents{font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.sbs-t{font-family:monospace;font-size:10px;color:var(--muted)}
+.sbs-msg{color:var(--muted);line-height:1.5;font-size:11px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sbs-tom{margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.sbs-score{font-size:11px;font-weight:700}
+.sbs-narrative{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.sbs-beliefs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.sbs-belief-pill{padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--card2)}
+
+/* ── Trust evolution ── */
+#trust-chart{max-height:300px}
+.trust-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.trust-legend-item{display:flex;align-items:center;gap:5px;font-size:11px}
+.trust-legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* ── Diff viewer ── */
+.diff-select{display:flex;gap:8px;margin-bottom:14px;align-items:center}
+.diff-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.diff-panel{border-radius:8px;overflow:hidden}
+.diff-head{padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:0.04em}
+.diff-head.orig{background:rgba(16,185,129,0.15);color:#34d399}
+.diff-head.injected-head{background:rgba(239,68,68,0.15);color:#f87171}
+.diff-body{padding:12px;background:var(--surface);border:1px solid var(--border);
+  border-top:none;border-radius:0 0 8px 8px;font-family:monospace;
+  font-size:12px;line-height:1.8;min-height:120px;white-space:pre-wrap;word-break:break-word}
+.diff-add{background:rgba(16,185,129,0.15);color:#34d399;border-radius:2px;padding:0 2px}
+.diff-del{background:rgba(239,68,68,0.15);color:#f87171;text-decoration:line-through;border-radius:2px;padding:0 2px}
+.diff-inject-marker{background:rgba(239,68,68,0.25);color:#fca5a5;
+  border:1px solid rgba(239,68,68,0.4);border-radius:4px;
+  padding:4px 8px;margin-top:8px;font-size:11px;display:block}
+.no-inject{color:var(--muted);font-style:italic;text-align:center;padding:32px;font-family:inherit}
+
+/* ── Belief panel ── */
+.beliefs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.belief-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:12px;transition:border-color 0.15s}
+.belief-card:hover{border-color:var(--border2)}
+.belief-agents{font-size:12px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:4px}
+.belief-arrow{color:var(--muted);font-size:10px}
+.belief-goal{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.bar-row{display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px}
+.bar-wrap{height:5px;border-radius:3px;background:var(--border);overflow:hidden;margin-bottom:6px}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
+
+/* ── Narrative ── */
+.narrative{background:var(--surface);border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;padding:12px 14px;font-size:13px;
+  line-height:1.7;margin-bottom:12px}
+
+/* ── Flags ── */
+.flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.flag{padding:2px 9px;border-radius:5px;font-size:10px;font-weight:700;
+  background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.25)}
+
+/* ── Score bar ── */
+.score-big{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.score-num{font-size:28px;font-weight:800;font-family:monospace;line-height:1}
+.score-bar-wrap{flex:1;height:8px;border-radius:4px;background:var(--border);overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width 0.5s}
+
+/* ── Query ── */
+.query-area{width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;color:var(--text);resize:none;outline:none;
+  transition:border-color 0.2s}
+.query-area:focus{border-color:var(--accent)}
+.query-btn{background:var(--accent);color:#fff;padding:8px 20px;border-radius:8px;
+  font-weight:700;font-size:12px;margin-top:8px;transition:all 0.2s;
+  box-shadow:0 0 12px rgba(99,102,241,0.3)}
+.query-btn:hover{box-shadow:0 0 20px rgba(99,102,241,0.5);transform:translateY(-1px)}
+.query-answer{background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:14px;font-size:13px;line-height:1.8;
+  margin-top:10px;white-space:pre-wrap}
+.example-q{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:8px 12px;cursor:pointer;font-size:12px;color:var(--muted);
+  transition:all 0.15s;margin-bottom:5px}
+.example-q:hover{border-color:var(--accent);color:var(--text)}
+
+/* ── Misc ── */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+.row{display:flex;align-items:center;gap:8px}
+.flex1{flex:1}
+.mt12{margin-top:12px}
+.section-title{font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.glow-danger{box-shadow:0 0 20px rgba(239,68,68,0.3)}
+.glow-warning{box-shadow:0 0 20px rgba(245,158,11,0.2)}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">T</div>
+    <span class="logo-text">MAS-ToM</span>
+    <span class="logo-sub">Security Sensemaking</span>
+  </div>
+  <div class="topbar-right">
+    <div class="row" style="gap:6px">
+      <div class="status-dot"></div>
+      <span style="font-size:11px;color:var(--muted)" id="status-label">Connecting…</span>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border)"></div>
+    <span style="font-size:11px;color:var(--muted)">Study condition:</span>
+    <div class="cond-wrap">
+      <button class="cond-btn active-a" id="btn-a" onclick="setCondition('raw')">A — Raw logs</button>
+      <button class="cond-btn" id="btn-b" onclick="setCondition('annotated')">B — ToM dashboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <h3>Scenarios</h3>
+      <div class="filter-row">
+        <input class="filter-input" id="f-attack" placeholder="Filter attack…" oninput="renderList()"/>
+      </div>
+      <select class="filter-input" id="f-topo" onchange="renderList()">
+        <option value="">All topologies</option>
+        <option>star</option><option>ring</option>
+        <option>hierarchical</option><option>fully_connected</option>
+      </select>
+      <div style="margin-top:6px">
+      <select class="filter-input" id="f-task" onchange="renderList()">
+        <option value="">All tasks</option>
+        <option>research_synthesis</option><option>code_review</option>
+        <option>qa_pipeline</option><option>planning</option>
+      </select>
+      </div>
+    </div>
+    <div class="scenario-list" id="s-list">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="content">
+    <div class="no-scenario">
+      <div class="no-scenario-icon">⬡</div>
+      <div style="font-size:16px;font-weight:700">Select a scenario</div>
+      <div style="color:var(--muted)">Choose from the sidebar to begin analysis</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const S = {
+  scenarios: [],
+  current: null,
+  cid: null,
+  condition: 'raw',
+  tab: 'network',
+  selectedT: null,
+  // playback
+  playing: false,
+  playT: 0,
+  playSpeed: 1,
+  playTimer: null,
+  // charts
+  anomalyChart: null,
+  trustChart: null,
+};
+
+const COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444',
+                 '#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16'];
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+async function boot() {
+  try {
+    const r = await fetch('/api/scenarios');
+    const d = await r.json();
+    S.scenarios = d.scenarios || [];
+    document.getElementById('status-label').textContent =
+      `${S.scenarios.length} scenarios loaded`;
+    renderList();
+  } catch(e) {
+    document.getElementById('status-label').textContent = 'API error';
+    document.getElementById('s-list').innerHTML =
+      `<div class="empty">Cannot reach API<br>${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONDITION
+// ═══════════════════════════════════════════════════════════════
+function setCondition(mode) {
+  S.condition = mode;
+  document.getElementById('btn-a').className =
+    'cond-btn' + (mode==='raw' ? ' active-a' : '');
+  document.getElementById('btn-b').className =
+    'cond-btn' + (mode==='annotated' ? ' active-b' : '');
+  if (S.cid) loadScenario(S.cid);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCENARIO LIST
+// ═══════════════════════════════════════════════════════════════
+function renderList() {
+  const fa = document.getElementById('f-attack').value.toLowerCase();
+  const ft = document.getElementById('f-topo').value;
+  const fk = document.getElementById('f-task').value;
+  const filtered = S.scenarios.filter(s =>
+    (!fa || s.attack_type.includes(fa)) &&
+    (!ft || s.topology === ft) &&
+    (!fk || s.task === fk)
+  );
+  const el = document.getElementById('s-list');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">No matches</div>'; return; }
+  el.innerHTML = filtered.map(s => `
+    <div class="s-item ${s.scenario_id===S.cid?'active':''}"
+         onclick="loadScenario('${s.scenario_id}')">
+      <div class="s-id">${s.scenario_id}</div>
+      <div class="s-meta">
+        <span class="badge b-${s.attack_type}">${s.attack_type}</span>
+        <span class="badge b-topo">${s.topology}</span>
+        <span class="badge b-task" style="font-size:9px">${s.task.replace('_',' ')}</span>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">
+        ${s.n_agents} agents · ${s.event_count} events
+        ${s.tom_annotated?'· <span style="color:var(--success)">ToM ✓</span>':''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD SCENARIO
+// ═══════════════════════════════════════════════════════════════
+async function loadScenario(id) {
+  S.cid = id;
+  S.selectedT = null;
+  S.playT = 0;
+  stopPlayback();
+  renderList();
+  document.getElementById('content').innerHTML =
+    '<div class="no-scenario"><div class="spinner"></div><div>Loading scenario…</div></div>';
+  try {
+    const r = await fetch(`/api/scenario/${id}?mode=${S.condition}`);
+    S.current = await r.json();
+    S.tab = S.condition === 'annotated' ? 'network' : 'sbs';
+    renderContent();
+  } catch(e) {
+    document.getElementById('content').innerHTML =
+      `<div class="no-scenario">Load failed: ${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER CONTENT
+// ═══════════════════════════════════════════════════════════════
+function renderContent() {
+  const sc = S.current;
+  if (!sc) return;
+  const events = sc.events || [];
+  const isToM  = S.condition === 'annotated';
+  const injected = events.filter(e => e.attack?.is_injected).length;
+  const peakAnomaly = isToM
+    ? Math.max(...events.map(e => e.tom?.anomaly_score || 0))
+    : 0;
+
+  const tabs = isToM
+    ? [['network','Agent network'],['playback','Live playback'],
+       ['sbs','Side-by-side'],['trust','Trust evolution'],
+       ['diff','Attack diff'],['beliefs','Belief states'],['query','Query (D3)']]
+    : [['sbs','Message log'],['diff','Attack diff']];
+
+  document.getElementById('content').innerHTML = `
+    <div class="scenario-header">
+      <div class="scenario-id">${sc.scenario_id}</div>
+      <div class="meta-row">
+        <span class="badge b-${sc.attack_type}">${sc.attack_type}</span>
+        <span class="badge b-topo">${sc.topology}</span>
+        <span class="badge b-task">${(sc.task||'').replace(/_/g,' ')}</span>
+        ${isToM?'<span class="badge b-info">ToM annotated</span>':''}
+      </div>
+      <div class="stat-pills">
+        <div class="stat-pill">
+          <div class="stat-val v-events">${events.length}</div>
+          <div class="stat-lbl">Events</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-val v-agents">${sc.n_agents}</div>
+          <div class="stat-lbl">Agents</div>
+        </div>
+        ${isToM?`
+        <div class="stat-pill ${peakAnomaly>0.7?'glow-danger':peakAnomaly>0.4?'glow-warning':''}">
+          <div class="stat-val v-anomaly">${peakAnomaly.toFixed(2)}</div>
+          <div class="stat-lbl">Peak anomaly</div>
+        </div>
+        <div class="stat-pill ${injected>0?'glow-danger':''}">
+          <div class="stat-val v-injected">${injected}</div>
+          <div class="stat-lbl">Injected</div>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <div class="tabs">
+      ${tabs.map(([id,label])=>`
+        <button class="tab ${S.tab===id?'active':''}" onclick="switchTab('${id}')">${label}</button>
+      `).join('')}
+    </div>
+
+    <div class="tab-panels">
+      ${tabs.map(([id])=>`
+        <div class="panel ${S.tab===id?'active':''}" id="panel-${id}"></div>
+      `).join('')}
+    </div>
+  `;
+
+  renderTab(S.tab);
+}
+
+function switchTab(tab) {
+  S.tab = tab;
+  stopPlayback();
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', t.textContent.trim() ===
+      (['network','playback','sbs','trust','diff','beliefs','query',
+        'sbs','diff'][['network','playback','sbs','trust','diff','beliefs','query',
+        'sbs','diff'].indexOf(tab)] || tab));
+  });
+  // simpler: just re-query
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => {
+    const map = {network:'Agent network',playback:'Live playback',sbs:'Side-by-side',
+      trust:'Trust evolution',diff:'Attack diff',beliefs:'Belief states',query:'Query (D3)',
+      'Message log':'sbs'};
+    if (t.getAttribute('onclick') === `switchTab('${tab}')`) t.classList.add('active');
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(`panel-${tab}`);
+  if (panel) { panel.classList.add('active'); renderTab(tab); }
+}
+
+function renderTab(tab) {
+  const panel = document.getElementById(`panel-${tab}`);
+  if (!panel) return;
+  const events = S.current?.events || [];
+  switch(tab) {
+    case 'network':   panel.innerHTML = networkHTML();   initNetwork(events); break;
+    case 'playback':  panel.innerHTML = playbackHTML();  initPlayback(events); break;
+    case 'sbs':       panel.innerHTML = sbsHTML(events); break;
+    case 'trust':     panel.innerHTML = trustHTML();     initTrustChart(events); break;
+    case 'diff':      panel.innerHTML = diffHTML(events); break;
+    case 'beliefs':   panel.innerHTML = beliefsHTML(events); break;
+    case 'query':     panel.innerHTML = queryHTML(); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 1 — AGENT NETWORK GRAPH
+// ═══════════════════════════════════════════════════════════════
+function networkHTML() {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Agent communication network</span>
+        <span class="card-sub">Edges light up as messages flow · Red = attack injection</span>
+      </div>
+      <svg id="network-svg"></svg>
+      <div id="network-info" style="margin-top:10px;min-height:40px;font-size:12px;color:var(--muted)">
+        Click an agent or edge to inspect
+      </div>
+    </div>
+  `;
+}
+
+function initNetwork(events) {
+  const svg = d3.select('#network-svg');
+  if (!svg.node()) return;
+  const W = svg.node().clientWidth || 600;
+  const H = 420;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  // build nodes + links from events
+  const agentIds = [...new Set(
+    events.flatMap(e => [e.sender, e.receiver])
+      .filter(a => a !== 'user_proxy' && !a.startsWith('relay_') && !a.startsWith('proxy_'))
+  )];
+
+  const linkMap = {};
+  events.forEach(e => {
+    if (!agentIds.includes(e.sender) || !agentIds.includes(e.receiver)) return;
+    const key = `${e.sender}|${e.receiver}`;
+    if (!linkMap[key]) linkMap[key] = { source:e.sender, target:e.receiver, count:0, injected:0 };
+    linkMap[key].count++;
+    if (e.attack?.is_injected) linkMap[key].injected++;
+  });
+
+  const nodes = agentIds.map((id,i) => ({
+    id, i,
+    color: COLORS[i % COLORS.length],
+    role: S.current?.agent_specs?.find(s=>s.agent_id===id)?.role || 'agent',
+  }));
+  const links = Object.values(linkMap);
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d=>d.id).distance(100))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide(40));
+
+  const defs = svg.append('defs');
+  ['normal','attack'].forEach(type => {
+    defs.append('marker')
+      .attr('id', `arrow-${type}`)
+      .attr('viewBox','0 0 10 10').attr('refX',28).attr('refY',5)
+      .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+      .append('path').attr('d','M0,0L10,5L0,10z')
+      .attr('fill', type==='attack' ? '#ef4444' : '#3a4a6a');
+  });
+
+  const link = svg.append('g').selectAll('line').data(links).join('line')
+    .attr('class', d => `link ${d.injected>0?'attack-link':''}`)
+    .attr('stroke', d => d.injected>0 ? '#ef4444' : '#2a3a6a')
+    .attr('stroke-width', d => Math.min(1+d.count*0.3, 4))
+    .attr('marker-end', d => `url(#arrow-${d.injected>0?'attack':'normal'})`);
+
+  const node = svg.append('g').selectAll('g').data(nodes).join('g')
+    .attr('class','node')
+    .call(d3.drag()
+      .on('start', (event,d) => { if(!event.active) sim.alphaTarget(0.3).restart(); d.fx=d.x;d.fy=d.y; })
+      .on('drag',  (event,d) => { d.fx=event.x; d.fy=event.y; })
+      .on('end',   (event,d) => { if(!event.active) sim.alphaTarget(0); d.fx=null;d.fy=null; })
+    )
+    .on('click', (event,d) => {
+      document.getElementById('network-info').innerHTML = `
+        <strong>${d.id}</strong> · Role: ${d.role} · 
+        Messages sent: ${events.filter(e=>e.sender===d.id).length} · 
+        Received: ${events.filter(e=>e.receiver===d.id).length}
+      `;
+    });
+
+  node.append('circle')
+    .attr('r', d => d.role==='orchestrator'||d.role==='planner' ? 22 : 16)
+    .attr('fill', d => d.color + '22')
+    .attr('stroke', d => d.color)
+    .attr('stroke-width', 2);
+
+  node.append('text')
+    .text(d => d.id.replace('agent_','A'))
+    .attr('text-anchor','middle').attr('dy','0.35em')
+    .attr('fill', d => d.color).attr('font-size','10px').attr('font-weight','700');
+
+  node.append('title').text(d => `${d.id} (${d.role})`);
+
+  sim.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  // animate active edge on playback event
+  window._flashEdge = (sender, receiver, isAttack) => {
+    link.each(function(d) {
+      if (d.source.id===sender && d.target.id===receiver) {
+        d3.select(this)
+          .attr('stroke', isAttack ? '#ef4444' : '#6366f1')
+          .attr('stroke-width', 4)
+          .transition().duration(800)
+          .attr('stroke', d.injected>0 ? '#ef4444' : '#2a3a6a')
+          .attr('stroke-width', Math.min(1+d.count*0.3,4));
+      }
+    });
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 2 — LIVE PLAYBACK
+// ═══════════════════════════════════════════════════════════════
+function playbackHTML() {
+  return `
+    <div class="playback-bar">
+      <div class="pb-controls">
+        <button class="pb-btn" onclick="seekPlayback(-1)">⏮</button>
+        <button class="pb-btn" id="pb-play" onclick="togglePlayback()">▶</button>
+        <button class="pb-btn" onclick="seekPlayback(1)">⏭</button>
+        <div class="pb-info">
+          <div class="pb-label">Current event</div>
+          <div class="pb-progress" id="pb-progress">t=0 / t=0</div>
+        </div>
+        <div class="pb-speed">
+          ${[0.5,1,2,4].map(s=>`
+            <button class="speed-btn ${S.playSpeed===s?'active':''}"
+              onclick="setSpeed(${s})">${s}x</button>
+          `).join('')}
+        </div>
+      </div>
+      <input type="range" class="pb-slider" id="pb-slider" min="0"
+        value="${S.playT}"
+        oninput="scrubTo(parseInt(this.value))"/>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Current event</span></div>
+        <div id="live-event-display"><div class="empty">Press play to begin</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">ToM snapshot</span>
+          <span class="card-sub" id="live-score-label">Anomaly: —</span>
+        </div>
+        <div id="live-tom-display"><div class="empty">—</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Anomaly score timeline</span></div>
+      <canvas id="anomaly-chart" style="max-height:160px"></canvas>
+    </div>
+  `;
+}
+
+function initPlayback(events) {
+  const slider = document.getElementById('pb-slider');
+  if (slider) slider.max = events.length - 1;
+  initAnomalyChart(events);
+  renderPlaybackFrame(events, S.playT);
+}
+
+function initAnomalyChart(events) {
+  const ctx = document.getElementById('anomaly-chart');
+  if (!ctx) return;
+  if (S.anomalyChart) { S.anomalyChart.destroy(); S.anomalyChart = null; }
+  const scores  = events.map(e => e.tom?.anomaly_score || 0);
+  const colors  = scores.map(s => s>0.7?'rgba(239,68,68,0.8)':s>0.4?'rgba(245,158,11,0.8)':'rgba(16,185,129,0.6)');
+  const inj     = events.map(e => e.attack?.is_injected ? Math.max(...scores,0.1) : null);
+  S.anomalyChart = new Chart(ctx, {
+    data: {
+      labels: events.map(e=>`t${e.t}`),
+      datasets: [
+        { type:'bar', label:'Anomaly', data:scores, backgroundColor:colors, borderRadius:3 },
+        { type:'line', label:'Injected', data:inj, borderColor:'rgba(239,68,68,0.6)',
+          backgroundColor:'transparent', pointRadius:events.map(e=>e.attack?.is_injected?5:0),
+          pointBackgroundColor:'#ef4444', borderDash:[4,4], spanGaps:false },
+      ]
+    },
+    options: {
+      responsive:true, animation:false,
+      plugins:{ legend:{ labels:{ color:'#6b7a99', font:{size:10} } } },
+      scales:{
+        x:{ ticks:{ color:'#6b7a99', font:{size:9}, maxTicksLimit:20 }, grid:{color:'#1e2a4a'} },
+        y:{ min:0, max:1, ticks:{ color:'#6b7a99', font:{size:9} }, grid:{color:'#1e2a4a'} }
+      },
+      onClick(_,els) {
+        if(els.length) scrubTo(els[0].index);
+      }
+    }
+  });
+}
+
+function renderPlaybackFrame(events, idx) {
+  if (!events.length) return;
+  idx = Math.max(0, Math.min(idx, events.length-1));
+  S.playT = idx;
+  const e = events[idx];
+  const slider = document.getElementById('pb-slider');
+  if (slider) slider.value = idx;
+  const prog = document.getElementById('pb-progress');
+  if (prog) prog.textContent = `t=${e.t} / t=${events[events.length-1].t}`;
+
+  // flash network edge
+  if (window._flashEdge) _flashEdge(e.sender, e.receiver, e.attack?.is_injected);
+
+  // live event
+  const score  = e.tom?.anomaly_score || 0;
+  const scoreColor = score>0.7?'var(--danger)':score>0.4?'var(--warning)':'var(--success)';
+  const leDel = document.getElementById('live-event-display');
+  if (leDel) leDel.innerHTML = `
+    <div class="live-event ${e.attack?.is_injected?'injected':score>0.4?'anomalous':''}">
+      <div class="le-meta">
+        <span class="le-t">t=${e.t}</span>
+        <span class="le-agents">${e.sender} → ${e.receiver}</span>
+        ${e.attack?.is_injected?'<span class="badge b-inject">INJECTED</span>':''}
+        <span class="le-score" style="margin-left:auto;color:${scoreColor}">
+          ▲ ${score.toFixed(3)}
+        </span>
+      </div>
+      <div class="le-msg">${esc(e.message)}</div>
+      ${e.attack?.is_injected&&e.attack.original_message?`
+        <div style="margin-top:8px;font-size:10px;color:var(--muted)">
+          Original: <span style="color:#fca5a5;font-family:monospace">
+            ${esc(e.attack.original_message.slice(0,120))}…
+          </span>
+        </div>
+      `:''}
+    </div>
+  `;
+
+  // live tom
+  const ltDel = document.getElementById('live-tom-display');
+  const sl = document.getElementById('live-score-label');
+  if (sl) sl.textContent = `Anomaly: ${score.toFixed(3)}`;
+  if (ltDel && e.tom) {
+    ltDel.innerHTML = `
+      <div class="narrative" style="font-size:12px;margin-bottom:10px">
+        ${esc(e.tom.narrative||'No narrative')}
+      </div>
+      ${e.tom.anomaly_flags?.length?`
+        <div class="flags">${e.tom.anomaly_flags.map(f=>`<span class="flag">${f}</span>`).join('')}</div>
+      `:''}
+      <div style="margin-top:10px">
+        ${(e.tom.beliefs||[]).map(b=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:11px;min-width:120px;font-weight:600">→ ${b.target_agent}</span>
+            <div style="flex:1;height:5px;border-radius:3px;background:var(--border)">
+              <div style="height:100%;border-radius:3px;width:${b.trust_score*100}%;
+                background:${b.trust_score<0.4?'var(--danger)':b.trust_score<0.6?'var(--warning)':'var(--success)'}">
+              </div>
+            </div>
+            <span style="font-size:10px;font-family:monospace;min-width:32px;
+              color:${b.trust_score<0.4?'var(--danger)':b.trust_score<0.6?'var(--warning)':'var(--success)'}">
+              ${b.trust_score.toFixed(2)}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+function togglePlayback() {
+  if (S.playing) stopPlayback();
+  else startPlayback();
+}
+function startPlayback() {
+  S.playing = true;
+  document.getElementById('pb-play').textContent = '⏸';
+  document.getElementById('pb-play').classList.add('playing');
+  const events = S.current?.events || [];
+  S.playTimer = setInterval(() => {
+    if (S.playT >= events.length - 1) { stopPlayback(); return; }
+    S.playT++;
+    renderPlaybackFrame(events, S.playT);
+  }, 1200 / S.playSpeed);
+}
+function stopPlayback() {
+  S.playing = false;
+  if (S.playTimer) { clearInterval(S.playTimer); S.playTimer = null; }
+  const btn = document.getElementById('pb-play');
+  if (btn) { btn.textContent = '▶'; btn.classList.remove('playing'); }
+}
+function seekPlayback(dir) {
+  stopPlayback();
+  scrubTo(S.playT + dir);
+}
+function scrubTo(idx) {
+  stopPlayback();
+  const events = S.current?.events || [];
+  renderPlaybackFrame(events, idx);
+}
+function setSpeed(s) {
+  S.playSpeed = s;
+  const wasPlaying = S.playing;
+  stopPlayback();
+  document.querySelectorAll('.speed-btn').forEach(b =>
+    b.classList.toggle('active', parseFloat(b.textContent)===s)
+  );
+  if (wasPlaying) startPlayback();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 3 — SIDE-BY-SIDE
+// ═══════════════════════════════════════════════════════════════
+function sbsHTML(events) {
+  const isToM = S.condition === 'annotated';
+  return `
+    <div class="sbs-wrap">
+      <div class="sbs-panel">
+        <div class="sbs-head raw-head">
+          <span>A — Raw message log</span>
+          <span style="font-size:10px;color:var(--muted);margin-left:auto">${events.length} events</span>
+        </div>
+        <div class="sbs-events">
+          ${events.map(e => `
+            <div class="sbs-event ${e.attack?.is_injected?'sbs-inject':''}"
+                 onclick="sbsSelect(${e.t})">
+              <div class="sbs-agents">
+                <span class="sbs-t">t=${e.t}</span>
+                ${e.sender} → ${e.receiver}
+                ${e.attack?.is_injected?'<span class="badge b-inject">⚠</span>':''}
+              </div>
+              <div class="sbs-msg">${esc(e.message)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="sbs-panel">
+        <div class="sbs-head tom-head">
+          <span>B — ToM annotated view</span>
+          <span style="font-size:10px;color:var(--muted);margin-left:auto">
+            ${isToM ? 'Beliefs · Anomaly scores · Narratives' : 'Switch to Condition B to see ToM data'}
+          </span>
+        </div>
+        <div class="sbs-events">
+          ${events.map(e => {
+            const score = e.tom?.anomaly_score || 0;
+            const sc = score>0.7?'var(--danger)':score>0.4?'var(--warning)':'var(--success)';
+            return `
+            <div class="sbs-event ${e.attack?.is_injected?'sbs-inject':''}"
+                 onclick="sbsSelect(${e.t})">
+              <div class="sbs-agents">
+                <span class="sbs-t">t=${e.t}</span>
+                ${e.sender} → ${e.receiver}
+                ${e.attack?.is_injected?'<span class="badge b-inject">⚠</span>':''}
+                ${isToM?`<span style="margin-left:auto;font-size:10px;font-weight:700;color:${sc}">▲${score.toFixed(2)}</span>`:''}
+              </div>
+              <div class="sbs-msg">${esc(e.message)}</div>
+              ${isToM && e.tom ? `
+                <div class="sbs-tom">
+                  <div class="sbs-score" style="color:${sc}">
+                    Anomaly: ${score.toFixed(3)}
+                    ${e.tom.anomaly_flags?.length?` · <span style="color:var(--danger)">${e.tom.anomaly_flags.join(', ')}</span>`:''}
+                  </div>
+                  <div class="sbs-narrative">${esc((e.tom.narrative||'').slice(0,120))}${e.tom.narrative?.length>120?'…':''}</div>
+                  <div class="sbs-beliefs">
+                    ${(e.tom.beliefs||[]).slice(0,3).map(b=>`
+                      <span class="sbs-belief-pill" style="color:${b.trust_score<0.4?'var(--danger)':b.trust_score<0.6?'var(--warning)':'var(--success)'}">
+                        ${b.target_agent.replace('agent_','A')}: ${b.trust_score.toFixed(1)}
+                      </span>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : (!isToM ? `<div class="sbs-tom" style="color:var(--muted);font-size:11px">
+                  Switch to Condition B to see ToM annotations
+                </div>`:'')
+              }
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function sbsSelect(t) {
+  document.querySelectorAll('.sbs-event').forEach((el,i) => {
+    const et = S.current?.events?.[Math.floor(i/2)]?.t;
+    el.classList.remove('sbs-selected');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 4 — TRUST EVOLUTION
+// ═══════════════════════════════════════════════════════════════
+function trustHTML() {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Trust score evolution over time</span>
+        <span class="card-sub">Each line = one agent's trust as seen by others · Diverging lines = attack signal</span>
+      </div>
+      <canvas id="trust-chart"></canvas>
+      <div class="trust-legend" id="trust-legend"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Anomaly score timeline</span>
+        <span class="card-sub">Combined mismatch signal across all agents</span>
+      </div>
+      <canvas id="anomaly-chart2" style="max-height:180px"></canvas>
+    </div>
+  `;
+}
+
+function initTrustChart(events) {
+  // build per-target trust over time
+  const targets = [...new Set(
+    events.flatMap(e => (e.tom?.beliefs||[]).map(b=>b.target_agent))
+  )];
+  const datasets = targets.map((target,i) => {
+    const data = events.map(e => {
+      const b = (e.tom?.beliefs||[]).find(b=>b.target_agent===target);
+      return b ? b.trust_score : null;
+    });
+    return {
+      label: target,
+      data,
+      borderColor: COLORS[i%COLORS.length],
+      backgroundColor: 'transparent',
+      pointRadius: 3,
+      pointBackgroundColor: COLORS[i%COLORS.length],
+      tension: 0.3,
+      spanGaps: true,
+    };
+  });
+
+  const ctx = document.getElementById('trust-chart');
+  if (!ctx) return;
+  if (S.trustChart) { S.trustChart.destroy(); }
+  S.trustChart = new Chart(ctx, {
+    type:'line',
+    data: { labels: events.map(e=>`t${e.t}`), datasets },
+    options: {
+      responsive:true,
+      plugins:{
+        legend:{ labels:{ color:'#6b7a99', font:{size:10}, boxWidth:12 } },
+        tooltip:{ callbacks:{
+          label: ctx => `${ctx.dataset.label}: ${ctx.raw?.toFixed(3)??'—'}`
+        }}
+      },
+      scales:{
+        x:{ ticks:{ color:'#6b7a99', font:{size:9}, maxTicksLimit:20 }, grid:{color:'#1e2a4a'} },
+        y:{ min:0, max:1, ticks:{ color:'#6b7a99', font:{size:9} }, grid:{color:'#1e2a4a'},
+            title:{ display:true, text:'Trust score', color:'#6b7a99', font:{size:10} } }
+      }
+    }
+  });
+
+  // anomaly chart 2
+  const ctx2 = document.getElementById('anomaly-chart2');
+  if (ctx2) {
+    const scores = events.map(e=>e.tom?.anomaly_score||0);
+    new Chart(ctx2,{
+      type:'line',
+      data:{
+        labels:events.map(e=>`t${e.t}`),
+        datasets:[{
+          label:'Anomaly score',
+          data:scores,
+          borderColor:'#ef4444',
+          backgroundColor:'rgba(239,68,68,0.1)',
+          fill:true, tension:0.3, pointRadius:2,
+          pointBackgroundColor: scores.map(s=>s>0.7?'#ef4444':s>0.4?'#f59e0b':'#10b981'),
+        }]
+      },
+      options:{
+        responsive:true, animation:false,
+        plugins:{ legend:{ labels:{ color:'#6b7a99', font:{size:10} } } },
+        scales:{
+          x:{ ticks:{ color:'#6b7a99', font:{size:9}, maxTicksLimit:20 }, grid:{color:'#1e2a4a'} },
+          y:{ min:0,max:1, ticks:{ color:'#6b7a99', font:{size:9} }, grid:{color:'#1e2a4a'} }
+        }
+      }
+    });
+  }
+
+  // legend
+  const leg = document.getElementById('trust-legend');
+  if (leg) leg.innerHTML = targets.map((t,i)=>`
+    <div class="trust-legend-item">
+      <div class="trust-legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>
+      <span>${t}</span>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 5 — ATTACK DIFF VIEWER
+// ═══════════════════════════════════════════════════════════════
+function diffHTML(events) {
+  const injected = events.filter(e=>e.attack?.is_injected);
+  if (!injected.length) return `
+    <div class="card">
+      <div class="empty" style="padding:60px">
+        No injected messages in this scenario.<br>
+        <span style="color:var(--muted)">Try an attack scenario (collusion, mitm, deception)</span>
+      </div>
+    </div>
+  `;
+
+  const first = injected[0];
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Attack injection diff viewer</span>
+        <span class="card-sub">${injected.length} injected messages detected</span>
+      </div>
+      <div class="diff-select">
+        <span style="color:var(--muted);font-size:12px">Select injected event:</span>
+        <select class="filter-input" style="width:auto" onchange="renderDiff(this.value)">
+          ${injected.map(e=>`
+            <option value="${e.t}">t=${e.t} · ${e.sender}→${e.receiver} · ${e.attack.injection_type}</option>
+          `).join('')}
+        </select>
+        <span class="badge b-inject" style="font-size:11px">
+          Type: ${first.attack.injection_type}
+        </span>
+      </div>
+      <div id="diff-content">${renderDiffContent(first)}</div>
+    </div>
+    <div class="card" id="diff-tom-card" style="${first.tom?.narrative?'':'display:none'}">
+      <div class="card-head"><span class="card-title">ToM interpretation of this injection</span></div>
+      <div id="diff-tom-content">
+        ${first.tom?.narrative ? `
+          <div class="narrative">${esc(first.tom.narrative)}</div>
+          ${first.tom.anomaly_flags?.length?`
+            <div class="flags">${first.tom.anomaly_flags.map(f=>`<span class="flag">${f}</span>`).join('')}</div>
+          `:''}
+          <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+            Anomaly score: <strong style="color:var(--danger)">${first.tom.anomaly_score?.toFixed(3)}</strong>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderDiff(t) {
+  const events = S.current?.events || [];
+  const e = events.find(ev=>ev.t===parseInt(t));
+  if (!e) return;
+  document.getElementById('diff-content').innerHTML = renderDiffContent(e);
+  const tomCard = document.getElementById('diff-tom-card');
+  const tomContent = document.getElementById('diff-tom-content');
+  if (tomCard && e.tom?.narrative) {
+    tomCard.style.display = 'block';
+    tomContent.innerHTML = `
+      <div class="narrative">${esc(e.tom.narrative)}</div>
+      ${e.tom.anomaly_flags?.length?`
+        <div class="flags">${e.tom.anomaly_flags.map(f=>`<span class="flag">${f}</span>`).join('')}</div>
+      `:''}
+      <div style="margin-top:10px;font-size:12px">
+        Anomaly score: <strong style="color:var(--danger)">${e.tom.anomaly_score?.toFixed(3)}</strong>
+      </div>
+    `;
+  }
+}
+
+function renderDiffContent(e) {
+  const orig = e.attack?.original_message || e.message;
+  const inj  = e.message;
+  const injType = e.attack?.injection_type || 'unknown';
+  const targets = (e.attack?.attack_targets||[]).join(', ') || '—';
+
+  // simple diff: highlight added content
+  const added = inj.replace(orig, '').trim();
+
+  return `
+    <div style="margin-bottom:12px;font-size:12px;color:var(--muted)">
+      <strong>t=${e.t}</strong> · ${e.sender} → ${e.receiver} ·
+      Injection type: <span style="color:var(--warning)">${injType}</span> ·
+      Targets: <span style="color:var(--danger)">${targets}</span>
+    </div>
+    <div class="diff-wrap">
+      <div class="diff-panel">
+        <div class="diff-head orig">ORIGINAL MESSAGE</div>
+        <div class="diff-body">${esc(orig)}</div>
+      </div>
+      <div class="diff-panel">
+        <div class="diff-head injected-head">INJECTED MESSAGE (received by agent)</div>
+        <div class="diff-body">
+          ${esc(orig)}
+          ${added ? `<span class="diff-inject-marker">⚠ INJECTED PAYLOAD: ${esc(added)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 6 — BELIEF STATES
+// ═══════════════════════════════════════════════════════════════
+function beliefsHTML(events) {
+  const isToM = S.condition === 'annotated';
+  if (!isToM) return '<div class="card"><div class="empty">Switch to Condition B to see belief states</div></div>';
+
+  const topE = events.reduce((a,b)=>
+    (a.tom?.anomaly_score||0)>(b.tom?.anomaly_score||0)?a:b, events[0]);
+
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Peak anomaly event — t=${topE?.t}</span>
+        <span class="badge b-inject">score: ${(topE?.tom?.anomaly_score||0).toFixed(3)}</span>
+      </div>
+      ${topE?.tom?.narrative?`<div class="narrative">${esc(topE.tom.narrative)}</div>`:''}
+      ${topE?.tom?.anomaly_flags?.length?`
+        <div class="flags">${topE.tom.anomaly_flags.map(f=>`<span class="flag">${f}</span>`).join('')}</div>
+      `:''}
+      <div class="beliefs-grid mt12">
+        ${(topE?.tom?.beliefs||[]).map(b=>{
+          const tc = b.trust_score<0.4?'var(--danger)':b.trust_score<0.6?'var(--warning)':'var(--success)';
+          return `
+          <div class="belief-card">
+            <div class="belief-agents">
+              <span>${topE.sender}</span>
+              <span class="belief-arrow">→</span>
+              <span style="color:var(--accent2)">${b.target_agent}</span>
+            </div>
+            <div class="belief-goal">${esc(b.inferred_goal)}</div>
+            <div class="bar-row"><span>Trust</span><span style="color:${tc};font-weight:700">${b.trust_score.toFixed(2)}</span></div>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${b.trust_score*100}%;background:${tc}"></div></div>
+            <div class="bar-row"><span style="color:var(--muted)">Confidence</span><span>${b.confidence.toFixed(2)}</span></div>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${b.confidence*100}%;background:var(--accent)"></div></div>
+            ${b.notes?`<div style="font-size:10px;color:var(--muted);margin-top:5px">${esc(b.notes)}</div>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">All events — belief browser</span>
+        <span class="card-sub">Click any event to inspect its ToM state</span>
+      </div>
+      <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+        ${events.map(e=>{
+          const score = e.tom?.anomaly_score||0;
+          const sc = score>0.7?'var(--danger)':score>0.4?'var(--warning)':'var(--success)';
+          return `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+            background:var(--surface);border:1px solid var(--border);border-radius:6px;
+            cursor:pointer;transition:border-color 0.15s"
+            onmouseover="this.style.borderColor='var(--accent)'"
+            onmouseout="this.style.borderColor='var(--border)'"
+            onclick="showBeliefDetail(${e.t})">
+            <span style="font-family:monospace;font-size:10px;color:var(--muted);min-width:30px">t=${e.t}</span>
+            <span style="font-weight:600;font-size:12px;flex:1">${e.sender} → ${e.receiver}</span>
+            ${e.attack?.is_injected?'<span class="badge b-inject">INJ</span>':''}
+            <div style="width:80px;height:5px;border-radius:3px;background:var(--border)">
+              <div style="height:100%;border-radius:3px;width:${score*100}%;background:${sc}"></div>
+            </div>
+            <span style="font-size:10px;font-family:monospace;color:${sc};min-width:36px">${score.toFixed(2)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div id="belief-detail"></div>
+  `;
+}
+
+function showBeliefDetail(t) {
+  const events = S.current?.events||[];
+  const e = events.find(ev=>ev.t===t);
+  if (!e||!e.tom) return;
+  const tc = s=>s<0.4?'var(--danger)':s<0.6?'var(--warning)':'var(--success)';
+  document.getElementById('belief-detail').innerHTML = `
+    <div class="card" style="border-color:var(--accent)">
+      <div class="card-head">
+        <span class="card-title">Belief detail — t=${t} · ${e.sender} → ${e.receiver}</span>
+      </div>
+      ${e.tom.narrative?`<div class="narrative">${esc(e.tom.narrative)}</div>`:''}
+      <div class="beliefs-grid">
+        ${(e.tom.beliefs||[]).map(b=>`
+          <div class="belief-card">
+            <div class="belief-agents">${e.sender} <span class="belief-arrow">→</span>
+              <span style="color:var(--accent2)">${b.target_agent}</span></div>
+            <div class="belief-goal">${esc(b.inferred_goal)}</div>
+            <div class="bar-row"><span>Trust</span>
+              <span style="color:${tc(b.trust_score)};font-weight:700">${b.trust_score.toFixed(2)}</span></div>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${b.trust_score*100}%;background:${tc(b.trust_score)}"></div></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('belief-detail').scrollIntoView({behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 7 — QUERY (D3)
+// ═══════════════════════════════════════════════════════════════
+function queryHTML() {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Natural language query — D3 interactive sensemaking</span>
+        <span class="card-sub">Ask anything about agent behavior, attacks, or beliefs</span>
+      </div>
+      <textarea class="query-area" id="q-text" rows="3"
+        placeholder="e.g. Which agents are colluding and what is the evidence?"></textarea>
+      <div><button class="query-btn" onclick="submitQuery()">Ask →</button></div>
+      <div id="q-result"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Example questions</span></div>
+      ${[
+        'Which agents appear to be colluding and why?',
+        'What is the most anomalous event and what caused it?',
+        'Was there a man-in-the-middle attack? What evidence supports this?',
+        'How did trust levels change over the course of the scenario?',
+        'What would a developer need to know to detect this attack from raw logs alone?',
+        'Compare what a developer would see in raw logs vs ToM annotations for this attack.',
+      ].map(q=>`
+        <div class="example-q"
+          onclick="document.getElementById('q-text').value='${q.replace(/'/g,"\\'")}'">${q}</div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function submitQuery() {
+  const q = document.getElementById('q-text')?.value?.trim();
+  const res = document.getElementById('q-result');
+  if (!q||!res||!S.cid) return;
+  res.innerHTML = '<div class="query-answer"><div class="spinner"></div> Thinking…</div>';
+  try {
+    const r = await fetch('/api/query',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scenario_id:S.cid,event_t:S.selectedT??0,question:q}),
+    });
+    const d = await r.json();
+    res.innerHTML = `<div class="query-answer">${esc(d.answer||d.error||'No response')}</div>`;
+  } catch(e) {
+    res.innerHTML = `<div class="query-answer">Error: ${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════
+boot();
+</script>
+</body>
+</html>
