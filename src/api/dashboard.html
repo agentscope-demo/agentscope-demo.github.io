@@ -127,7 +127,11 @@ input,textarea,select{font-family:inherit;font-size:13px}
 .node text{fill:var(--text);font-size:11px;font-weight:600;pointer-events:none}
 .link{stroke-width:1.5;fill:none;opacity:0.6}
 .link.active-link{stroke-width:3;opacity:1}
-.link.attack-link{stroke:var(--danger);opacity:0.9}
+.link.attack-link{stroke:var(--danger);opacity:0.9;stroke-dasharray:5,3;animation:march 1s linear infinite}
+@keyframes march{to{stroke-dashoffset:-16}}
+
+.blame-badge-bg{fill:rgba(0,0,0,0.85);stroke:var(--border2);stroke-width:1}
+.blame-badge-text{font-size:9px;font-weight:800;font-family:monospace;text-anchor:middle;dominant-baseline:middle}
 
 /* ── Playback ── */
 .playback-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
@@ -445,6 +449,11 @@ function renderContent() {
     ? Math.max(...events.map(e => e.tom?.anomaly_score || 0))
     : 0;
 
+  const findings = events
+    .filter(e => (e.tom?.anomaly_score > 0.5) || e.attack?.is_injected)
+    .sort((a,b) => (b.tom?.anomaly_score||0) - (a.tom?.anomaly_score||0))
+    .slice(0, 3);
+
   const tabs = isToM
     ? [['network','Agent network'],['playback','Live playback'],
        ['sbs','Side-by-side'],['trust','Trust evolution'],
@@ -453,31 +462,63 @@ function renderContent() {
 
   document.getElementById('content').innerHTML = `
     <div class="scenario-header">
-      <div class="scenario-id">${sc.scenario_id}</div>
-      <div class="meta-row">
-        <span class="badge b-${sc.attack_type}">${sc.attack_type}</span>
-        <span class="badge b-topo">${sc.topology}</span>
-        <span class="badge b-task">${(sc.task||'').replace(/_/g,' ')}</span>
-        ${isToM?'<span class="badge b-info">ToM annotated</span>':''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="scenario-id">${sc.scenario_id}</div>
+          <div class="meta-row">
+            <span class="badge b-${sc.attack_type}">${sc.attack_type}</span>
+            <span class="badge b-topo">${sc.topology}</span>
+            <span class="badge b-task">${(sc.task||'').replace(/_/g,' ')}</span>
+            ${isToM?'<span class="badge b-info">ToM annotated</span>':''}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Current Goal</div>
+          <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);padding:4px 12px;border-radius:6px;color:var(--accent);font-weight:700;font-size:12px">
+            ${(sc.task||'').replace(/_/g,' ').toUpperCase()}
+          </div>
+        </div>
       </div>
-      <div class="stat-pills">
-        <div class="stat-pill">
-          <div class="stat-val v-events">${events.length}</div>
-          <div class="stat-lbl">Events</div>
+
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:20px;margin-top:14px">
+        <div class="stat-pills" style="margin-top:0">
+          <div class="stat-pill">
+            <div class="stat-val v-events">${events.length}</div>
+            <div class="stat-lbl">Events</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-val v-agents">${sc.n_agents}</div>
+            <div class="stat-lbl">Agents</div>
+          </div>
+          ${isToM?`
+          <div class="stat-pill ${peakAnomaly>0.7?'glow-danger':peakAnomaly>0.4?'glow-warning':''}">
+            <div class="stat-val v-anomaly">${peakAnomaly.toFixed(2)}</div>
+            <div class="stat-lbl">Peak anomaly</div>
+          </div>
+          <div class="stat-pill ${injected>0?'glow-danger':''}">
+            <div class="stat-val v-injected">${injected}</div>
+            <div class="stat-lbl">Injected</div>
+          </div>` : ''}
         </div>
-        <div class="stat-pill">
-          <div class="stat-val v-agents">${sc.n_agents}</div>
-          <div class="stat-lbl">Agents</div>
-        </div>
-        ${isToM?`
-        <div class="stat-pill ${peakAnomaly>0.7?'glow-danger':peakAnomaly>0.4?'glow-warning':''}">
-          <div class="stat-val v-anomaly">${peakAnomaly.toFixed(2)}</div>
-          <div class="stat-lbl">Peak anomaly</div>
-        </div>
-        <div class="stat-pill ${injected>0?'glow-danger':''}">
-          <div class="stat-val v-injected">${injected}</div>
-          <div class="stat-lbl">Injected</div>
-        </div>` : ''}
+
+        ${findings.length ? `
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700">Quick Insights / Findings</div>
+            <div style="display:flex;gap:10px;overflow-x:auto">
+              ${findings.map(f => `
+                <div style="flex:1;min-width:200px;background:var(--surface);padding:6px 10px;border-radius:6px;border-left:3px solid ${f.attack?.is_injected?'var(--danger)':'var(--warning)'}">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                    <span style="font-family:monospace;font-size:10px;color:var(--muted)">t=${f.t} · ${f.sender}</span>
+                    <span style="font-size:10px;font-weight:800;color:${(f.tom?.anomaly_score||0)>0.7?'var(--danger)':'var(--warning)'}">▲${(f.tom?.anomaly_score||0).toFixed(2)}</span>
+                  </div>
+                  <div style="font-size:11px;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+                    ${esc(f.tom?.narrative || f.message)}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
       </div>
     </div>
 
@@ -565,6 +606,13 @@ function initNetwork(events) {
       .filter(a => a !== 'user_proxy' && !a.startsWith('relay_') && !a.startsWith('proxy_'))
   )];
 
+  const peakAnomalies = {};
+  events.forEach(e => {
+    const score = e.tom?.anomaly_score || 0;
+    peakAnomalies[e.sender] = Math.max(peakAnomalies[e.sender] || 0, score);
+    peakAnomalies[e.receiver] = Math.max(peakAnomalies[e.receiver] || 0, score);
+  });
+
   const linkMap = {};
   events.forEach(e => {
     if (!agentIds.includes(e.sender) || !agentIds.includes(e.receiver)) return;
@@ -578,6 +626,7 @@ function initNetwork(events) {
     id, i,
     color: COLORS[i % COLORS.length],
     role: S.current?.agent_specs?.find(s=>s.agent_id===id)?.role || 'agent',
+    blame: peakAnomalies[id] || 0,
   }));
   const links = Object.values(linkMap);
 
@@ -611,10 +660,24 @@ function initNetwork(events) {
       .on('end',   (event,d) => { if(!event.active) sim.alphaTarget(0); d.fx=null;d.fy=null; })
     )
     .on('click', (event,d) => {
+      const topFinding = events
+        .filter(e => (e.sender===d.id || e.receiver===d.id) && e.tom?.anomaly_score > 0.4)
+        .sort((a,b) => b.tom.anomaly_score - a.tom.anomaly_score)[0];
+
       document.getElementById('network-info').innerHTML = `
-        <strong>${d.id}</strong> · Role: ${d.role} · 
-        Messages sent: ${events.filter(e=>e.sender===d.id).length} · 
-        Received: ${events.filter(e=>e.receiver===d.id).length}
+        <div style="display:flex;gap:12px">
+          <div style="flex:1">
+            <strong style="color:var(--accent2);font-size:14px">${d.id}</strong> · ${d.role}<br>
+            Sent: ${events.filter(e=>e.sender===d.id).length} · Received: ${events.filter(e=>e.receiver===d.id).length} · 
+            Peak Anomaly: <span style="color:${d.blame>0.7?'var(--danger)':d.blame>0.4?'var(--warning)':'var(--success)'}">${d.blame.toFixed(2)}</span>
+          </div>
+          ${topFinding ? `
+            <div style="flex:1;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.1);padding:6px;border-radius:4px;font-size:11px">
+              <div style="color:var(--danger);font-weight:700;font-size:9px;text-transform:uppercase">Top Finding</div>
+              ${esc(topFinding.tom.narrative.slice(0,100))}…
+            </div>
+          ` : ''}
+        </div>
       `;
     });
 
@@ -629,7 +692,16 @@ function initNetwork(events) {
     .attr('text-anchor','middle').attr('dy','0.35em')
     .attr('fill', d => d.color).attr('font-size','10px').attr('font-weight','700');
 
-  node.append('title').text(d => `${d.id} (${d.role})`);
+  // Blame badge
+  const badge = node.filter(d => d.blame > 0.1).append('g')
+    .attr('transform', d => `translate(${d.role==='orchestrator'||d.role==='planner' ? 18 : 12}, -14)`);
+
+  badge.append('circle').attr('r', 10).attr('class', 'blame-badge-bg');
+  badge.append('text').attr('class', 'blame-badge-text')
+    .attr('fill', d => d.blame>0.7?'var(--danger)':d.blame>0.4?'var(--warning)':'var(--success)')
+    .text(d => Math.round(d.blame * 100));
+
+  node.append('title').text(d => `${d.id} (${d.role})\nPeak Anomaly: ${d.blame.toFixed(2)}`);
 
   sim.on('tick', () => {
     link
@@ -1056,7 +1128,7 @@ function diffHTML(events) {
         <span style="color:var(--muted);font-size:12px">Select injected event:</span>
         <select class="filter-input" style="width:auto" onchange="renderDiff(this.value)">
           ${injected.map(e=>`
-            <option value="${e.t}">t=${e.t} · ${e.sender}→${e.receiver} · ${e.attack.injection_type}</option>
+            <option value="${e.t}">t=${e.t} · ${e.sender}→${e.receiver} · ${first.attack.injection_type}</option>
           `).join('')}
         </select>
         <span class="badge b-inject" style="font-size:11px">
