@@ -1,0 +1,26 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "test_scenario",
+      "topology": "star",
+      "attack_type": "baseline",
+      "n_agents": 4,
+      "task": "research_synthesis",
+      "tom_annotated": false,
+      "event_count": 1,
+      "raw_path": "logs/raw/test_scenario.raw.json",
+      "annotated_path": null
+    },
+    {
+      "scenario_id": "star__baseline__research_synthesis__4a",
+      "topology": "star",
+      "attack_type": "baseline",
+      "n_agents": 4,
+      "task": "research_synthesis",
+      "tom_annotated": true,
+      "event_count": 20,
+      "raw_path": "logs\\raw\\star__baseline__research_synthesis__4a.raw.json",
+      "annotated_path": null
+    }
+  ]
+}

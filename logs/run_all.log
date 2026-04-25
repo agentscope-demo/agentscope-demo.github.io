@@ -1,0 +1,20 @@
+2026-04-25 01:48:31 | INFO     | tom.logger | Logging initialised — level=INFO file=logs\run_all.log
+2026-04-25 01:48:31 | INFO     | __main__ | MAS-ToM run_all starting
+2026-04-25 01:48:31 | INFO     | __main__ | Model: gpt-4o-mini | Log dir: logs
+2026-04-25 01:48:31 | INFO     | __main__ | Matrix: 1 topologies × 1 attacks × 1 agent counts × 1 tasks = 1 scenarios
+2026-04-25 01:48:32 | INFO     | __main__ | Progress: 1 / 1
+2026-04-25 01:48:32 | INFO     | __main__ | ════════════════════════════════════════════════════════════════
+2026-04-25 01:48:32 | INFO     | __main__ | RUNNING: star__baseline__research_synthesis__4a
+2026-04-25 01:48:32 | INFO     | __main__ | ════════════════════════════════════════════════════════════════
+2026-04-25 01:48:32 | INFO     | simulation.runner | Starting scenario: star__baseline__research_synthesis__4a  (topology=star, attack=baseline, n=4)
+2026-04-25 01:54:09 | INFO     | simulation.runner | Raw log saved: logs\raw\star__baseline__research_synthesis__4a.raw.json
+2026-04-25 01:54:09 | INFO     | simulation.runner | Scenario complete: star__baseline__research_synthesis__4a  (20 events captured)
+2026-04-25 01:54:09 | INFO     | __main__ | Simulation done in 337.3s — 20 events
+2026-04-25 01:54:09 | INFO     | tom.annotator | Annotating star__baseline__research_synthesis__4a  (20 events)
+2026-04-25 01:56:24 | INFO     | tom.annotator | Annotated log saved: logs\annotated\star__baseline__research_synthesis__4a.annotated.json
+2026-04-25 01:56:24 | INFO     | tom.annotator | Annotation complete: star__baseline__research_synthesis__4a
+2026-04-25 01:56:24 | INFO     | __main__ | Annotation done in 134.4s — 20 events
+2026-04-25 01:56:24 | INFO     | __main__ | Index updated: 2 scenarios total
+2026-04-25 01:56:24 | INFO     | __main__ | ════════════════════════════════════════════════════════════════
+2026-04-25 01:56:24 | INFO     | __main__ | DONE: 1 completed / 0 failed / 1 total
+2026-04-25 01:56:24 | INFO     | __main__ | Index: logs\scenarios.index.json
